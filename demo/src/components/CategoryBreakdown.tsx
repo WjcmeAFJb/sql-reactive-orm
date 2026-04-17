@@ -1,4 +1,5 @@
 import { use } from "react";
+import { sql } from "kysely";
 import { orm } from "@/db/orm";
 import {
   Card,
@@ -9,36 +10,38 @@ import {
 import { cn, formatMoney } from "@/lib/utils";
 
 /**
- * A pure SQL aggregate driving the breakdown. The ORM auto-watches
- * the `transactions` + `categories` tables (scanned from FROM/JOIN),
- * and on every mutation diffs the new rows against the previous ones
- * and patches in place, keyed by `id`. So when a single transaction
- * changes a single category's total, only the `BreakdownRow` reading
- * that category's `.total` re-renders — not the whole list.
+ * A kysely-authored aggregate driving the breakdown — no SQL strings,
+ * no type annotations. The row shape (`id`, `name`, `color`, `total`)
+ * is inferred straight from the builder via the generated `DB` type.
+ *
+ * On every mutation to the watched tables the ORM auto-refetches,
+ * then diffs the new rows against the old ones (keyed by `id`) and
+ * patches in place. So when a single transaction moves a single
+ * category's total, only the `BreakdownRow` reading that category's
+ * `.total` re-renders.
  */
 export function CategoryBreakdown() {
   const rows = use(
-    orm.sqlQuery<{
-      id: number;
-      name: string;
-      color: string;
-      total: number;
-    }>(
-      `SELECT c.id, c.name, c.color, ABS(SUM(t.amount)) AS total
-         FROM categories c
-         JOIN transactions t
-           ON t.categoryId = c.id
-          AND t.amount < 0
-          AND t.date >= date('now','-30 days')
-        WHERE c.kind = 'expense'
-        GROUP BY c.id
-        ORDER BY total DESC`,
-      [],
+    orm.sqlQuery(
+      (db) =>
+        db
+          .selectFrom("categories as c")
+          .innerJoin("transactions as t", (join) =>
+            join
+              .onRef("t.categoryId", "=", "c.id")
+              .on("t.amount", "<", 0)
+              .on("t.date", ">=", sql<string>`date('now', '-30 days')`),
+          )
+          .where("c.kind", "=", "expense")
+          .select(["c.id", "c.name", "c.color"])
+          .select((eb) => eb.fn.sum<number>("t.amount").as("total"))
+          .groupBy("c.id")
+          .orderBy("total", "asc"),
       { keyBy: (r) => r.id },
     ),
   );
 
-  const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+  const grandTotal = rows.reduce((s, r) => s + Math.abs(r.total), 0);
 
   return (
     <Card>
@@ -65,7 +68,8 @@ function BreakdownRow({
   row: { name: string; color: string; total: number };
   grandTotal: number;
 }) {
-  const pct = grandTotal > 0 ? (row.total / grandTotal) * 100 : 0;
+  const abs = Math.abs(row.total);
+  const pct = grandTotal > 0 ? (abs / grandTotal) * 100 : 0;
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-sm">
@@ -77,7 +81,7 @@ function BreakdownRow({
           <span>{row.name}</span>
         </div>
         <span className="tabular-nums text-muted-foreground">
-          {formatMoney(row.total)}
+          {formatMoney(abs)}
         </span>
       </div>
       <div className="h-1.5 rounded bg-muted overflow-hidden">

@@ -33,7 +33,8 @@ export interface EntitySchema {
 }
 
 export interface EntityClass<T extends Entity = Entity> {
-  new (orm: import("./orm.js").Orm, id: unknown): T;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  new (orm: import("./orm.js").Orm<any>, id: unknown): T;
   schema: EntitySchema;
 }
 

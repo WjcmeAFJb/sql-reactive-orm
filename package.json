@@ -8,15 +8,20 @@
     ".": "./src/index.ts",
     "./drivers/sqljs": "./src/drivers/sqljs.ts"
   },
+  "bin": {
+    "sql-reactive-orm-codegen": "./src/cli/codegen.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "test:node": "vitest run --project node",
     "test:browser": "vitest run --project browser",
     "typecheck": "tsc --noEmit",
     "demo": "pnpm --filter money-tracker-demo dev",
-    "demo:build": "pnpm --filter money-tracker-demo build"
+    "demo:build": "pnpm --filter money-tracker-demo build",
+    "demo:codegen": "pnpm --filter money-tracker-demo codegen"
   },
   "dependencies": {
+    "kysely": "^0.28.16",
     "mobx": "^6.13.5"
   },
   "peerDependencies": {

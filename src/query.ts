@@ -215,7 +215,8 @@ export class Query<T> implements Promise<T> {
   private _currentPromise: Promise<T>;
 
   constructor(
-    private readonly _orm: Orm,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private readonly _orm: Orm<any>,
     private readonly _cls: EntityClass<Entity>,
     private readonly _opts: QueryOptions,
     private readonly _kind: QueryKind,
@@ -355,7 +356,7 @@ function collectTables(
 // ---- eager loading ----
 
 export async function eagerLoad(
-  orm: Orm,
+  orm: Orm<any>, // eslint-disable-line @typescript-eslint/no-explicit-any
   parentCls: EntityClass<Entity>,
   parents: Entity[],
   withSpec: WithSpec,
@@ -381,7 +382,7 @@ export async function eagerLoad(
 }
 
 async function loadRelationBatch(
-  orm: Orm,
+  orm: Orm<any>, // eslint-disable-line @typescript-eslint/no-explicit-any
   parentCls: EntityClass<Entity>,
   parents: Entity[],
   relName: string,

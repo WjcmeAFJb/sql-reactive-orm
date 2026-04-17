@@ -11,6 +11,14 @@ import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
 import type { EntityClass, FieldDef, RelationDef } from "./schema.js";
 import { SqlQuery, type SqlQueryOptions } from "./sql-query.js";
+import {
+  DummyDriver,
+  Kysely,
+  SqliteAdapter,
+  SqliteIntrospector,
+  SqliteQueryCompiler,
+  type Compilable,
+} from "kysely";
 
 function sqlKey(
   sql: string,
@@ -37,7 +45,7 @@ function encode(def: FieldDef, value: unknown): unknown {
  *   - identity maps (one Map per entity; ensures `find(User, 1) === find(User, 1)`)
  *   - a table mutation bus (Queries subscribe; relations listen for invalidation)
  */
-export class Orm {
+export class Orm<DB = unknown> {
   /**
    * Reactive driver: any `run` / `exec` through this driver that looks
    * like a mutation (INSERT / UPDATE / DELETE / REPLACE / DROP TABLE /
@@ -73,12 +81,26 @@ export class Orm {
    * component's re-renders don't re-issue the SELECT.
    */
   private readonly _queryCache = new Map<string, Query<unknown>>();
-  private readonly _sqlCache = new Map<string, SqlQuery<Record<string, unknown>>>();
+  private readonly _sqlCache = new Map<string, SqlQuery<unknown>>();
+  /**
+   * Kysely instance configured for SQLite + a DummyDriver — we use it
+   * exclusively to compile typed query builders to `{ sql, parameters }`.
+   * Execution still goes through our own reactive driver.
+   */
+  readonly kysely: Kysely<DB>;
 
   constructor(driver: Driver) {
     this.rawDriver = driver;
     this.driver = wrapReactive(driver, (tables) => {
       for (const t of tables) this._notifyTable(t);
+    });
+    this.kysely = new Kysely<DB>({
+      dialect: {
+        createAdapter: () => new SqliteAdapter(),
+        createDriver: () => new DummyDriver(),
+        createIntrospector: (db) => new SqliteIntrospector(db),
+        createQueryCompiler: () => new SqliteQueryCompiler(),
+      },
     });
   }
 
@@ -442,16 +464,53 @@ export class Orm {
    * Pass `watch: [...]` to override, or `keyBy: (row) => row.id` to
    * match rows across re-orderings.
    */
-  sqlQuery<T extends Record<string, unknown> = Record<string, unknown>>(
+  /**
+   * Kysely form — pass a builder callback and get strongly-typed rows
+   * for free:
+   *
+   *   const rows = use(orm.sqlQuery((db) => db
+   *     .selectFrom('categories as c')
+   *     .innerJoin('transactions as t', 't.categoryId', 'c.id')
+   *     .select(['c.id', 'c.name'])
+   *     .select(eb => eb.fn.sum('t.amount').as('total'))
+   *     .groupBy('c.id'),
+   *     { keyBy: (r) => r.id }))
+   *
+   * No explicit generic needed; the row shape comes from kysely.
+   */
+  sqlQuery<Output>(
+    build: (db: Kysely<DB>) => Compilable<Output>,
+    options?: SqlQueryOptions<Output>,
+  ): SqlQuery<Output>;
+  /** Raw-SQL form — use when you need something kysely can't express. */
+  sqlQuery<Output = Record<string, unknown>>(
     sql: string,
-    params: readonly unknown[] = [],
-    options: SqlQueryOptions<T> = {},
-  ): SqlQuery<T> {
+    params?: readonly unknown[],
+    options?: SqlQueryOptions<Output>,
+  ): SqlQuery<Output>;
+  sqlQuery<Output>(
+    arg0: string | ((db: Kysely<DB>) => Compilable<Output>),
+    arg1?: readonly unknown[] | SqlQueryOptions<Output>,
+    arg2?: SqlQueryOptions<Output>,
+  ): SqlQuery<Output> {
+    let sql: string;
+    let params: readonly unknown[];
+    let options: SqlQueryOptions<Output>;
+    if (typeof arg0 === "function") {
+      const compiled = arg0(this.kysely).compile();
+      sql = compiled.sql;
+      params = compiled.parameters;
+      options = (arg1 as SqlQueryOptions<Output>) ?? {};
+    } else {
+      sql = arg0;
+      params = (arg1 as readonly unknown[] | undefined) ?? [];
+      options = arg2 ?? {};
+    }
     const key = sqlKey(sql, params, options);
     const cached = this._sqlCache.get(key);
-    if (cached) return cached as SqlQuery<T>;
-    const q = new SqlQuery<T>(this, sql, params, options);
-    this._sqlCache.set(key, q as unknown as SqlQuery<Record<string, unknown>>);
+    if (cached) return cached as SqlQuery<Output>;
+    const q = new SqlQuery<Output>(this, sql, params, options);
+    this._sqlCache.set(key, q as unknown as SqlQuery<unknown>);
     return q;
   }
 

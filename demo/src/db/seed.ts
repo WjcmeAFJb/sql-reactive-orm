@@ -33,7 +33,8 @@ const TX_NOTES = [
   null,
 ];
 
-export async function seed(orm: Orm): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function seed(orm: Orm<any>): Promise<void> {
   const probe = orm.findFirst(Account);
   const existing = await probe;
   probe.dispose();

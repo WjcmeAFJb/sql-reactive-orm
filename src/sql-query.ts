@@ -4,7 +4,13 @@ import {
   observable,
   runInAction,
 } from "mobx";
+import type { Compilable } from "kysely";
 import type { Orm } from "./orm.js";
+
+/** Accepts either a raw SQL string or a kysely-returning callback. */
+export type SqlSource<DB, T> =
+  | string
+  | ((db: import("kysely").Kysely<DB>) => Compilable<T>);
 
 export interface SqlQueryOptions<T> {
   /**
@@ -39,9 +45,7 @@ export interface SqlQueryOptions<T> {
  * between refetches still triggers the coarse `.length` observer, so
  * lists add / drop items reactively.
  */
-export class SqlQuery<T extends Record<string, unknown> = Record<string, unknown>>
-  implements Promise<T[]>
-{
+export class SqlQuery<T = Record<string, unknown>> implements Promise<T[]> {
   readonly [Symbol.toStringTag] = "SqlQuery";
 
   status: "pending" | "fulfilled" | "rejected" = "pending";
@@ -55,7 +59,8 @@ export class SqlQuery<T extends Record<string, unknown> = Record<string, unknown
   private _runId = 0;
 
   constructor(
-    private readonly _orm: Orm,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private readonly _orm: Orm<any>,
     private readonly _sql: string,
     private readonly _params: readonly unknown[],
     private readonly _options: SqlQueryOptions<T>,
@@ -113,14 +118,22 @@ export class SqlQuery<T extends Record<string, unknown> = Record<string, unknown
   private async _execute(): Promise<T[]> {
     const id = ++this._runId;
     try {
-      const rows = await this._orm.driver.all<T>(this._sql, this._params);
-      if (id !== this._runId) return rows;
+      const rows = await this._orm.driver.all<T & Record<string, unknown>>(
+        this._sql,
+        this._params,
+      );
+      if (id !== this._runId) return rows as T[];
       runInAction(() => {
         if (this.status !== "fulfilled") {
-          this.value.replace(rows.map((r) => observable.object(r) as T));
+          this.value.replace(
+            rows.map(
+              (r) =>
+                observable.object(r as Record<string, unknown>) as unknown as T,
+            ),
+          );
           this.status = "fulfilled";
         } else {
-          this._patchArray(this.value, rows);
+          this._patchArray(this.value, rows as unknown as T[]);
         }
         this.reason = undefined;
       });
@@ -138,9 +151,16 @@ export class SqlQuery<T extends Record<string, unknown> = Record<string, unknown
   private _patchArray(target: IObservableArray<T>, incoming: T[]): void {
     const keyBy = this._options.keyBy;
     if (keyBy) {
-      patchByKey(target, incoming, keyBy as (row: T) => unknown);
+      patchByKey(
+        target as unknown as IObservableArray<Record<string, unknown>>,
+        incoming as unknown as Record<string, unknown>[],
+        keyBy as (row: unknown) => unknown,
+      );
     } else {
-      patchByPosition(target, incoming);
+      patchByPosition(
+        target as unknown as IObservableArray<Record<string, unknown>>,
+        incoming as unknown as Record<string, unknown>[],
+      );
     }
   }
 }
@@ -222,31 +242,29 @@ function patchArrayPositional<E>(
   }
 }
 
-function patchByPosition<T extends Record<string, unknown>>(
-  target: IObservableArray<T>,
-  incoming: T[],
+function patchByPosition(
+  target: IObservableArray<Record<string, unknown>>,
+  incoming: Record<string, unknown>[],
 ): void {
   const minLen = Math.min(target.length, incoming.length);
   for (let i = 0; i < minLen; i++) {
-    patchObject(
-      target[i] as Record<string, unknown>,
-      incoming[i] as Record<string, unknown>,
-    );
+    patchObject(target[i]!, incoming[i]!);
   }
   if (incoming.length > target.length) {
     for (let i = minLen; i < incoming.length; i++) {
-      target.push(observable.object(incoming[i]!) as T);
+      target.push(observable.object(incoming[i]!));
     }
   } else if (incoming.length < target.length) {
     target.splice(incoming.length, target.length - incoming.length);
   }
 }
 
-function patchByKey<T extends Record<string, unknown>>(
-  target: IObservableArray<T>,
-  incoming: T[],
-  keyBy: (row: T) => unknown,
+function patchByKey(
+  target: IObservableArray<Record<string, unknown>>,
+  incoming: Record<string, unknown>[],
+  keyBy: (row: unknown) => unknown,
 ): void {
+  type T = Record<string, unknown>;
   const byKey = new Map<unknown, T>();
   for (const row of target) byKey.set(keyBy(row), row);
   const next: T[] = new Array(incoming.length);
@@ -319,5 +337,5 @@ export function detectReadTables(sql: string): Set<string> {
 
 /** Augments `use(sqlQuery)` so React 19 accepts it as a thenable of `T[]`. */
 declare module "react" {
-  function use<T extends Record<string, unknown>>(q: SqlQuery<T>): T[];
+  function use<T>(q: SqlQuery<T>): T[];
 }

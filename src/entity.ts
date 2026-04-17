@@ -52,7 +52,8 @@ export abstract class Entity {
    * `orm.insert()` etc.
    */
   constructor(
-    public readonly _orm: Orm,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public readonly _orm: Orm<any>,
     id: unknown,
   ) {
     this.id = id;

@@ -2,6 +2,7 @@ import { Orm } from "sql-reactive-orm";
 import { SqlJsDriver } from "sql-reactive-orm/drivers/sqljs";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { observable, runInAction } from "mobx";
+import type { DB } from "@/generated/db";
 import { Account, Category, Transaction } from "./entities";
 import { seed } from "./seed";
 
@@ -18,7 +19,7 @@ export const stats = observable({
   lastMutation: "",
 });
 
-async function init(): Promise<Orm> {
+async function init(): Promise<Orm<DB>> {
   const driver = await SqlJsDriver.open({ locateFile: () => wasmUrl });
 
   // Instrument the *underlying* driver so every call — including those
@@ -45,7 +46,7 @@ async function init(): Promise<Orm> {
     return res;
   }) as typeof driver.run;
 
-  const orm = new Orm(driver);
+  const orm = new Orm<DB>(driver);
   await orm.register(Account, Category, Transaction);
   await seed(orm);
 
