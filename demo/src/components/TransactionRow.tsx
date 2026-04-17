@@ -9,7 +9,6 @@ import { deleteTransaction } from "@/db/actions";
 import { ui } from "@/ui/ui-state";
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
-  
   const amount = use(tx.amount);
   const note = use(tx.note);
   const date = use(tx.date);
@@ -20,13 +19,8 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
   const isTransfer = transferId != null;
   const categoryName = category ? use(category.name) : null;
   const categoryColor = category ? use(category.color) : null;
-  // `account` can be transiently null: when you cascade-delete an
-  // account along with its transactions, both mutations fire in one
-  // BEGIN/COMMIT and the relation refresh briefly leaves un-rendered
-  // rows pointing at a missing account before the list query
-  // refetches and drops them.
-  const accountName = account ? use(account.name) : "(deleted)";
-  const accountColor = account ? use(account.color) : "#9ca3af";
+  const accountName = use(account.name);
+  const accountColor = use(account.color);
 
   const dotColor = isTransfer ? accountColor : (categoryColor ?? "#9ca3af");
 

@@ -418,7 +418,26 @@ async function loadRelationBatch(
     }
     for (const p of parents) {
       const fk = parentFks.get(p);
-      p._applyRelation(relName, fk != null ? byId.get(fk) ?? null : null);
+      if (fk == null) {
+        // Legitimate null foreign key → relation is null.
+        p._applyRelation(relName, null);
+        continue;
+      }
+      const hit = byId.get(fk);
+      if (hit !== undefined) {
+        p._applyRelation(relName, hit);
+        continue;
+      }
+      // FK points at a row that no longer exists. This happens
+      // transiently during a cascading delete: `_refreshCachedRelationsFor`
+      // captured this parent before `_refreshCachedRowsFor` got the
+      // chance to drop it from the identity map, so we're looking up a
+      // foreign key whose target we just deleted. Setting the relation
+      // to `null` here would violate the schema's declared non-null
+      // `Promise<Account>` and crash any observer that reads
+      // `parent.rel.name` before the next query refetch removes the
+      // parent itself. We keep the previously-resolved relation
+      // promise in place — the parent is about to unmount anyway.
     }
     return children;
   }

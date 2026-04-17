@@ -10,7 +10,6 @@ import { TransactionRow } from "./TransactionRow";
 import { Transaction } from "@/db/entities";
 
 export function TransactionList() {
-  
   const rows = use(
     orm.findAll(Transaction, {
       orderBy: [
