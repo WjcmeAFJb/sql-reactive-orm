@@ -7,9 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Account } from "@/db/entities";
 import { ui } from "@/ui/ui-state";
 
-export type AccountFormMode =
-  | { kind: "create" }
-  | { kind: "edit"; account: Account };
+export type AccountFormMode = { kind: "create" } | { kind: "edit"; account: Account };
 
 const COLORS = [
   "#3b82f6",
@@ -30,7 +28,6 @@ type FormState = {
 };
 
 export function AccountForm({ mode }: { mode: AccountFormMode }) {
-  
   const initial =
     mode.kind === "edit"
       ? {
@@ -75,12 +72,7 @@ export function AccountForm({ mode }: { mode: AccountFormMode }) {
 
   async function handleDelete(): Promise<void> {
     if (mode.kind !== "edit") return;
-    if (
-      !confirm(
-        "Delete this account and all its transactions? This can't be undone.",
-      )
-    )
-      return;
+    if (!confirm("Delete this account and all its transactions? This can't be undone.")) return;
     s.busy = true;
     try {
       await mode.account.remove();
@@ -173,9 +165,7 @@ function Footer({
 }) {
   return (
     <div className="flex justify-between pt-2">
-      <div>
-        {mode.kind === "edit" && <DeleteButton state={state} onClick={onDelete} />}
-      </div>
+      <div>{mode.kind === "edit" && <DeleteButton state={state} onClick={onDelete} />}</div>
       <div className="flex gap-2">
         <Button type="button" variant="ghost" onClick={() => ui.close()}>
           Cancel
@@ -186,39 +176,18 @@ function Footer({
   );
 }
 
-function DeleteButton({
-  state,
-  onClick,
-}: {
-  state: FormState;
-  onClick: () => void;
-}) {
+function DeleteButton({ state, onClick }: { state: FormState; onClick: () => void }) {
   return (
-    <Button
-      type="button"
-      variant="destructive"
-      onClick={onClick}
-      disabled={state.busy}
-    >
+    <Button type="button" variant="destructive" onClick={onClick} disabled={state.busy}>
       Delete
     </Button>
   );
 }
 
-function SubmitButton({
-  state,
-  mode,
-}: {
-  state: FormState;
-  mode: AccountFormMode;
-}) {
+function SubmitButton({ state, mode }: { state: FormState; mode: AccountFormMode }) {
   return (
     <Button type="submit" disabled={state.busy || !state.name.trim()}>
-      {state.busy
-        ? "Saving…"
-        : mode.kind === "edit"
-          ? "Save"
-          : "Add account"}
+      {state.busy ? "Saving…" : mode.kind === "edit" ? "Save" : "Add account"}
     </Button>
   );
 }

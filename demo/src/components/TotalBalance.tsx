@@ -10,10 +10,7 @@ import { Account } from "@/db/entities";
  * number.
  */
 export function TotalBalance() {
-  
-  const accounts = use(
-    orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
-  );
+  const accounts = use(orm.findAll(Account, { orderBy: "id", with: { transactions: true } }));
   let total = 0;
   for (const a of accounts) {
     total += use(a.initialBalance) as number;
@@ -21,12 +18,8 @@ export function TotalBalance() {
   }
   return (
     <div className="flex items-baseline gap-3">
-      <span className="text-xs uppercase tracking-wider text-muted-foreground">
-        Net worth
-      </span>
-      <span className="text-3xl font-semibold tabular-nums">
-        {formatMoney(total)}
-      </span>
+      <span className="text-xs uppercase tracking-wider text-muted-foreground">Net worth</span>
+      <span className="text-3xl font-semibold tabular-nums">{formatMoney(total)}</span>
     </div>
   );
 }

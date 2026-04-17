@@ -24,10 +24,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
 
   return (
     <div className="group flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors">
-      <div
-        className="size-2 shrink-0 rounded-full"
-        style={{ backgroundColor: dotColor }}
-      />
+      <div className="size-2 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">
@@ -36,10 +33,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
               : (note ?? categoryName ?? "Uncategorized")}
           </span>
           {isTransfer ? (
-            <Badge
-              variant="secondary"
-              className="gap-1 text-[10px] font-normal"
-            >
+            <Badge variant="secondary" className="gap-1 text-[10px] font-normal">
               <ArrowLeftRight className="size-3" /> transfer
             </Badge>
           ) : note && categoryName ? (

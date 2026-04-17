@@ -14,9 +14,6 @@ export interface RunResult {
 export interface Driver {
   exec(sql: string): Promise<void>;
   run(sql: string, params?: readonly unknown[]): Promise<RunResult>;
-  all<T = Record<string, unknown>>(
-    sql: string,
-    params?: readonly unknown[],
-  ): Promise<T[]>;
+  all<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<T[]>;
   close?(): Promise<void>;
 }

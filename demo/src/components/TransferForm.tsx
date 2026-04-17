@@ -25,7 +25,6 @@ type FormState = {
 };
 
 export function TransferForm() {
-  
   const accounts = use(orm.findAll(Account, { orderBy: "id" }));
 
   const s = useLocalObservable<FormState>(() => ({
@@ -73,13 +72,7 @@ export function TransferForm() {
   );
 }
 
-function FromSelect({
-  state,
-  accounts,
-}: {
-  state: FormState;
-  accounts: readonly Account[];
-}) {
+function FromSelect({ state, accounts }: { state: FormState; accounts: readonly Account[] }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor="from">From</Label>
@@ -97,13 +90,7 @@ function FromSelect({
   );
 }
 
-function ToSelect({
-  state,
-  accounts,
-}: {
-  state: FormState;
-  accounts: readonly Account[];
-}) {
+function ToSelect({ state, accounts }: { state: FormState; accounts: readonly Account[] }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor="to">To</Label>
@@ -184,10 +171,7 @@ function Footer({ state }: { state: FormState }) {
 
 function SubmitButton({ state }: { state: FormState }) {
   return (
-    <Button
-      type="submit"
-      disabled={state.busy || !state.amount || state.fromId === state.toId}
-    >
+    <Button type="submit" disabled={state.busy || !state.amount || state.fromId === state.toId}>
       {state.busy ? "Saving…" : "Move money"}
     </Button>
   );

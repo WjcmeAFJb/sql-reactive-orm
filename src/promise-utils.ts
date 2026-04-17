@@ -58,8 +58,6 @@ export function track<T>(promise: Promise<T>): TrackedPromise<T> {
   return p as TrackedPromise<T>;
 }
 
-export function isFulfilled<T>(
-  p: Promise<T>,
-): p is Promise<T> & { status: "fulfilled"; value: T } {
+export function isFulfilled<T>(p: Promise<T>): p is Promise<T> & { status: "fulfilled"; value: T } {
   return (p as MutThenable<T>).status === "fulfilled";
 }

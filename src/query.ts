@@ -29,9 +29,7 @@ export type WithClause =
   | { [relation: string]: true | WithClause };
 
 export type OrderDir = "asc" | "desc";
-export type OrderBy =
-  | string
-  | readonly (string | readonly [string, OrderDir])[];
+export type OrderBy = string | readonly (string | readonly [string, OrderDir])[];
 
 export interface QueryOptions {
   where?: WhereClause;
@@ -70,14 +68,8 @@ export function buildWhere(where?: WhereClause): {
       parts.push(`${col} IS NULL`);
       continue;
     }
-    if (
-      typeof raw === "object" &&
-      !Array.isArray(raw) &&
-      !(raw instanceof Uint8Array)
-    ) {
-      for (const [op, val] of Object.entries(
-        raw as Record<string, unknown>,
-      )) {
+    if (typeof raw === "object" && !Array.isArray(raw) && !(raw instanceof Uint8Array)) {
+      for (const [op, val] of Object.entries(raw as Record<string, unknown>)) {
         if (op === "in" || op === "nin") {
           const vals = val as readonly unknown[];
           if (vals.length === 0) {
@@ -143,11 +135,7 @@ export function expandWith(w: WithClause | undefined): WithSpec {
 }
 
 /** Normalised JSON-ish serialisation for stable query-cache keys. */
-export function queryKey(
-  kind: QueryKind,
-  entityName: string,
-  opts: QueryOptions,
-): string {
+export function queryKey(kind: QueryKind, entityName: string, opts: QueryOptions): string {
   return `${kind}:${entityName}:${stableStringify(opts)}`;
 }
 
@@ -156,13 +144,7 @@ function stableStringify(v: unknown): string {
   if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
   const obj = v as Record<string, unknown>;
   const keys = Object.keys(obj).sort();
-  return (
-    "{" +
-    keys
-      .map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k]))
-      .join(",") +
-    "}"
-  );
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k])).join(",") + "}";
 }
 
 // ---- Query ----
@@ -240,9 +222,7 @@ export class Query<T> implements Promise<T> {
     return this._currentPromise.then(onFulfilled, onRejected);
   }
 
-  catch<V = never>(
-    onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null,
-  ): Promise<T | V> {
+  catch<V = never>(onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null): Promise<T | V> {
     return this._currentPromise.catch(onRejected);
   }
 
@@ -299,8 +279,7 @@ export class Query<T> implements Promise<T> {
     const { sql: whereSql, params } = buildWhere(this._opts.where);
     let sql = `SELECT ${selectCols} FROM "${schema.table}"`;
     if (whereSql) sql += ` ${whereSql}`;
-    if (this._opts.orderBy)
-      sql += ` ORDER BY ${buildOrderBy(this._opts.orderBy)}`;
+    if (this._opts.orderBy) sql += ` ORDER BY ${buildOrderBy(this._opts.orderBy)}`;
     const effectiveLimit =
       this._kind === "findFirst"
         ? 1
@@ -320,12 +299,7 @@ export class Query<T> implements Promise<T> {
     });
 
     if (this._opts.with) {
-      await eagerLoad(
-        this._orm,
-        this._cls,
-        instances,
-        expandWith(this._opts.with),
-      );
+      await eagerLoad(this._orm, this._cls, instances, expandWith(this._opts.with));
     }
 
     if (this._kind === "findAll") return instances as unknown as T;
@@ -339,11 +313,7 @@ export class Query<T> implements Promise<T> {
   }
 }
 
-function collectTables(
-  cls: EntityClass<Entity>,
-  withSpec: WithSpec,
-  out: Set<string>,
-): void {
+function collectTables(cls: EntityClass<Entity>, withSpec: WithSpec, out: Set<string>): void {
   out.add(cls.schema.table);
   for (const [relName, nested] of Object.entries(withSpec)) {
     const rel = cls.schema.relations[relName];
@@ -364,17 +334,8 @@ export async function eagerLoad(
   if (parents.length === 0) return;
   for (const [relName, nested] of Object.entries(withSpec)) {
     const rel = parentCls.schema.relations[relName];
-    if (!rel)
-      throw new Error(
-        `Unknown relation "${relName}" on ${parentCls.schema.name}`,
-      );
-    const children = await loadRelationBatch(
-      orm,
-      parentCls,
-      parents,
-      relName,
-      rel,
-    );
+    if (!rel) throw new Error(`Unknown relation "${relName}" on ${parentCls.schema.name}`);
+    const children = await loadRelationBatch(orm, parentCls, parents, relName, rel);
     if (nested !== true && children.length > 0) {
       await eagerLoad(orm, rel.target(), children, nested);
     }
@@ -446,16 +407,12 @@ async function loadRelationBatch(
   const parentKeys = new Set<unknown>();
   const parentLocal = new Map<Entity, unknown>();
   for (const p of parents) {
-    const v =
-      rel.localKey === parentSchema.primaryKey
-        ? p.id
-        : await p._getField(rel.localKey);
+    const v = rel.localKey === parentSchema.primaryKey ? p.id : await p._getField(rel.localKey);
     parentLocal.set(p, v);
     if (v != null) parentKeys.add(v);
   }
   if (parentKeys.size === 0) {
-    for (const p of parents)
-      p._applyRelation(relName, rel.kind === "hasOne" ? null : []);
+    for (const p of parents) p._applyRelation(relName, rel.kind === "hasOne" ? null : []);
     return children;
   }
   const ph = Array.from(parentKeys, () => "?").join(",");
@@ -478,11 +435,8 @@ async function loadRelationBatch(
   }
   for (const p of parents) {
     const lv = parentLocal.get(p);
-    const matches = lv != null ? byFk.get(lv) ?? [] : [];
-    p._applyRelation(
-      relName,
-      rel.kind === "hasOne" ? matches[0] ?? null : matches,
-    );
+    const matches = lv != null ? (byFk.get(lv) ?? []) : [];
+    p._applyRelation(relName, rel.kind === "hasOne" ? (matches[0] ?? null) : matches);
   }
   return children;
 }

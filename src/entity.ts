@@ -41,10 +41,7 @@ export abstract class Entity {
   private _rowLoad: Promise<Record<string, unknown>> | null = null;
   private readonly _pendingFieldCache: Map<string, Promise<unknown>> = new Map();
   private readonly _pendingRelations: Map<string, Promise<unknown>> = new Map();
-  private readonly _rowScopedCache: WeakMap<
-    object,
-    Map<string, Promise<unknown>>
-  > = new WeakMap();
+  private readonly _rowScopedCache: WeakMap<object, Map<string, Promise<unknown>>> = new WeakMap();
 
   /**
    * Instances are created exclusively by the ORM identity map. Do not
@@ -131,10 +128,7 @@ export abstract class Entity {
 
   private _fetchRelation(name: string): Promise<unknown> {
     const rel = this._schema().relations[name];
-    if (!rel)
-      throw new Error(
-        `No relation "${name}" on entity "${this._schema().name}"`,
-      );
+    if (!rel) throw new Error(`No relation "${name}" on entity "${this._schema().name}"`);
     return this._orm._loadRelation(this, rel).then((value) => {
       // Route through `_applyRelation` so the shallow-compare fast-path
       // kicks in here too (relevant for lazy relation reads that race
@@ -248,10 +242,7 @@ export abstract class Entity {
   }
 }
 
-function rowsShallowEqual(
-  a: Record<string, unknown>,
-  b: Record<string, unknown>,
-): boolean {
+function rowsShallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const ak = Object.keys(a);
   const bk = Object.keys(b);
   if (ak.length !== bk.length) return false;
@@ -262,10 +253,7 @@ function rowsShallowEqual(
   return true;
 }
 
-function relationValuesEqual(
-  cached: Promise<unknown>,
-  next: unknown,
-): boolean {
+function relationValuesEqual(cached: Promise<unknown>, next: unknown): boolean {
   if (!isFulfilled(cached)) return false;
   const prev = cached.value;
   if (prev === next) return true;

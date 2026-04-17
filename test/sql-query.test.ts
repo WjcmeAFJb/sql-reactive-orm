@@ -16,17 +16,20 @@ afterEach(async () => {
 
 describe("detectReadTables", () => {
   it("extracts FROM + JOIN table names", () => {
-    expect([
-      ...detectReadTables(
-        "SELECT c.name FROM categories c JOIN transactions t ON t.categoryId = c.id",
-      ),
-    ].sort()).toEqual(["categories", "transactions"]);
+    expect(
+      [
+        ...detectReadTables(
+          "SELECT c.name FROM categories c JOIN transactions t ON t.categoryId = c.id",
+        ),
+      ].sort(),
+    ).toEqual(["categories", "transactions"]);
   });
 
   it("handles quoted identifiers", () => {
-    expect([...detectReadTables('SELECT 1 FROM "users" AS u JOIN `posts` p')]).toEqual(
-      ["users", "posts"],
-    );
+    expect([...detectReadTables('SELECT 1 FROM "users" AS u JOIN `posts` p')]).toEqual([
+      "users",
+      "posts",
+    ]);
   });
 });
 
@@ -174,11 +177,9 @@ describe("orm.sqlQuery — reactivity", () => {
   it("inserts + removals reflow the array", async () => {
     const a = await orm.insert(User, { name: "A", email: "a@x", age: 10 });
     const b = await orm.insert(User, { name: "B", email: "b@x", age: 20 });
-    const q = orm.sqlQuery<{ id: number }>(
-      'SELECT id FROM "users" ORDER BY id',
-      [],
-      { keyBy: (r) => r.id },
-    );
+    const q = orm.sqlQuery<{ id: number }>('SELECT id FROM "users" ORDER BY id', [], {
+      keyBy: (r) => r.id,
+    });
     await q;
     expect(q.value.length).toBe(2);
 
@@ -198,12 +199,8 @@ describe("orm.sqlQuery — reactivity", () => {
 
   it("caches queries so inline re-creation is stable", async () => {
     await orm.insert(User, { name: "A", email: "a@x", age: 1 });
-    const q1 = orm.sqlQuery<{ n: number }>(
-      'SELECT COUNT(*) AS n FROM "users"',
-    );
-    const q2 = orm.sqlQuery<{ n: number }>(
-      'SELECT COUNT(*) AS n FROM "users"',
-    );
+    const q1 = orm.sqlQuery<{ n: number }>('SELECT COUNT(*) AS n FROM "users"');
+    const q2 = orm.sqlQuery<{ n: number }>('SELECT COUNT(*) AS n FROM "users"');
     expect(q1).toBe(q2); // same Query instance
     q1.dispose();
   });

@@ -1,8 +1,4 @@
-import initSqlJs, {
-  type BindParams,
-  type Database,
-  type SqlJsStatic,
-} from "sql.js";
+import initSqlJs, { type BindParams, type Database, type SqlJsStatic } from "sql.js";
 import type { Driver, RunResult } from "../driver.js";
 
 export interface SqlJsDriverOptions {
@@ -47,10 +43,7 @@ export class SqlJsDriver implements Driver {
     db.exec(sql);
   }
 
-  async run(
-    sql: string,
-    params: readonly unknown[] = [],
-  ): Promise<RunResult> {
+  async run(sql: string, params: readonly unknown[] = []): Promise<RunResult> {
     const db = await this._ready();
     const stmt = db.prepare(sql);
     try {
@@ -64,12 +57,10 @@ export class SqlJsDriver implements Driver {
     // that's the right answer for INSERT sql with 0 rows, and it's the last
     // rowid otherwise.
     const last = db.exec("SELECT last_insert_rowid()");
-    const lastId =
-      last[0]?.values[0]?.[0];
+    const lastId = last[0]?.values[0]?.[0];
     return {
       changes,
-      lastInsertRowid:
-        typeof lastId === "number" || typeof lastId === "bigint" ? lastId : 0,
+      lastInsertRowid: typeof lastId === "number" || typeof lastId === "bigint" ? lastId : 0,
     };
   }
 

@@ -40,11 +40,7 @@ const PostTitle = observer(function PostTitle({ post }: { post: Post }) {
   return <span data-testid={`post-${post.id}`}>{title}</span>;
 });
 
-const UserWithPosts = observer(function UserWithPosts({
-  user,
-}: {
-  user: User;
-}) {
+const UserWithPosts = observer(function UserWithPosts({ user }: { user: User }) {
   const name = use(user.name);
   const posts = use(user.posts);
   return (
@@ -72,9 +68,7 @@ describe("react: reactive Promise fields + `use`", () => {
       </Suspense>,
     );
     // Row is already loaded, `use` returns sync — no loading indicator.
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Alice");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Alice");
   });
 
   it("suspends on lazy field load then renders value", async () => {
@@ -95,9 +89,7 @@ describe("react: reactive Promise fields + `use`", () => {
     );
     // Suspense fallback visible first, then the resolved value.
     await expect.element(screen.getByTestId("fallback")).toBeInTheDocument();
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Alice");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Alice");
   });
 
   it("re-renders with new value when the entity row is updated", async () => {
@@ -107,13 +99,9 @@ describe("react: reactive Promise fields + `use`", () => {
         <UserName user={u} />
       </Suspense>,
     );
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Alice");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Alice");
     await orm.update(u, { name: "Bob" });
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Bob");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Bob");
   });
 });
 
@@ -153,9 +141,7 @@ describe("react: reactive findAll + Suspense", () => {
     // Delete: drop user "A".
     const all = await orm.findAll(User, { orderBy: "id" });
     await orm.delete(all[0]!);
-    await expect
-      .element(screen.getByTestId("list"))
-      .not.toHaveTextContent("A");
+    await expect.element(screen.getByTestId("list")).not.toHaveTextContent("A");
   });
 });
 
@@ -171,7 +157,7 @@ describe("react: waterfall avoidance via `with`", () => {
     const driver = orm.driver;
     const origAll = driver.all.bind(driver);
     const queries: string[] = [];
-    driver.all = (async <T = Record<string, unknown>>(
+    driver.all = (async <T = Record<string, unknown>,>(
       sql: string,
       params?: readonly unknown[],
     ): Promise<T[]> => {
@@ -202,12 +188,8 @@ describe("react: waterfall avoidance via `with`", () => {
     await expect
       .element(screen.getByTestId(`uwp-${u.id}`))
       .toContainElement(screen.getByTestId(`post-${1}`).element());
-    await expect
-      .element(screen.getByTestId(`post-1`))
-      .toHaveTextContent("P1");
-    await expect
-      .element(screen.getByTestId(`post-2`))
-      .toHaveTextContent("P2");
+    await expect.element(screen.getByTestId(`post-1`)).toHaveTextContent("P1");
+    await expect.element(screen.getByTestId(`post-2`)).toHaveTextContent("P2");
 
     // The key waterfall-avoidance assertion: posts are loaded in a single
     // IN-batch, not once per user. A per-post belongsTo lookup would look
@@ -225,10 +207,10 @@ describe("react: reactive to raw SQL — Entity methods with hand-written statem
     // driver and refreshes subscribed queries / observers.
     class UserX extends User {
       async rename(next: string): Promise<void> {
-        await this._orm.driver.run(
-          'UPDATE "users" SET name = ? WHERE id = ?',
-          [next, this.id as number],
-        );
+        await this._orm.driver.run('UPDATE "users" SET name = ? WHERE id = ?', [
+          next,
+          this.id as number,
+        ]);
       }
     }
     Object.assign(UserX, { schema: User.schema });
@@ -239,16 +221,12 @@ describe("react: reactive to raw SQL — Entity methods with hand-written statem
         <UserName user={u} />
       </Suspense>,
     );
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Alice");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Alice");
 
     // The ORM was never told that a mutation happened; the reactive
     // driver wrapper detected the UPDATE and invalidated on its own.
     await u.rename("Bob");
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Bob");
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Bob");
   });
 });
 
@@ -278,23 +256,13 @@ describe("react: identity map guarantees stable instances across renders", () =>
     }
 
     const screen = await render(<App />);
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Alice");
-    await expect
-      .element(screen.getByTestId(`profile-${u.id}`))
-      .toHaveTextContent(/name:Alice/);
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Alice");
+    await expect.element(screen.getByTestId(`profile-${u.id}`)).toHaveTextContent(/name:Alice/);
 
     await orm.update(u, { name: "Bob", email: "b@x" });
-    await expect
-      .element(screen.getByTestId(`name-${u.id}`))
-      .toHaveTextContent("Bob");
-    await expect
-      .element(screen.getByTestId(`profile-${u.id}`))
-      .toHaveTextContent(/name:Bob/);
-    await expect
-      .element(screen.getByTestId(`profile-${u.id}`))
-      .toHaveTextContent(/email:b@x/);
+    await expect.element(screen.getByTestId(`name-${u.id}`)).toHaveTextContent("Bob");
+    await expect.element(screen.getByTestId(`profile-${u.id}`)).toHaveTextContent(/name:Bob/);
+    await expect.element(screen.getByTestId(`profile-${u.id}`)).toHaveTextContent(/email:b@x/);
 
     // Still the same identity-map instance.
     const looked = await orm.find(User, u.id);

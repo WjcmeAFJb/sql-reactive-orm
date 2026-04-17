@@ -21,9 +21,7 @@ import type { Driver, RunResult } from "./driver.js";
 export function detectMutatedTables(sql: string): Set<string> {
   const out = new Set<string>();
   // Strip comments so they don't seed false matches.
-  const stripped = sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ");
+  const stripped = sql.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
   for (const pattern of MUTATION_PATTERNS) {
     pattern.lastIndex = 0;
     let m: RegExpExecArray | null;
@@ -68,10 +66,7 @@ const TXN_ROLLBACK = /^\s*ROLLBACK\b/i;
  * unrelated query-builder library that was handed the same driver,
  * participates in reactivity automatically.
  */
-export function wrapReactive(
-  driver: Driver,
-  onMutation: (tables: Set<string>) => void,
-): Driver {
+export function wrapReactive(driver: Driver, onMutation: (tables: Set<string>) => void): Driver {
   const deferred = new Set<string>();
   let depth = 0;
 
@@ -109,18 +104,13 @@ export function wrapReactive(
       await driver.exec(sql);
       notifyOrDefer(sql);
     },
-    run: async (
-      sql: string,
-      params?: readonly unknown[],
-    ): Promise<RunResult> => {
+    run: async (sql: string, params?: readonly unknown[]): Promise<RunResult> => {
       const result = await driver.run(sql, params);
       notifyOrDefer(sql);
       return result;
     },
-    all: <T = Record<string, unknown>>(
-      sql: string,
-      params?: readonly unknown[],
-    ): Promise<T[]> => driver.all<T>(sql, params),
+    all: <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<T[]> =>
+      driver.all<T>(sql, params),
   };
   if (driver.close) wrapped.close = () => driver.close!();
   return wrapped;

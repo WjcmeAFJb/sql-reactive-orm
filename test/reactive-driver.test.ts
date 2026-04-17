@@ -4,49 +4,27 @@ import type { Driver } from "../src/index.js";
 
 describe("detectMutatedTables", () => {
   it("parses INSERT / UPDATE / DELETE / REPLACE with unquoted names", () => {
-    expect([...detectMutatedTables("INSERT INTO users VALUES (1)")]).toEqual([
-      "users",
-    ]);
-    expect([...detectMutatedTables("UPDATE users SET name = 'x'")]).toEqual([
-      "users",
-    ]);
-    expect([...detectMutatedTables("DELETE FROM users WHERE id = 1")]).toEqual([
-      "users",
-    ]);
-    expect([...detectMutatedTables("REPLACE INTO users VALUES (1)")]).toEqual([
-      "users",
-    ]);
+    expect([...detectMutatedTables("INSERT INTO users VALUES (1)")]).toEqual(["users"]);
+    expect([...detectMutatedTables("UPDATE users SET name = 'x'")]).toEqual(["users"]);
+    expect([...detectMutatedTables("DELETE FROM users WHERE id = 1")]).toEqual(["users"]);
+    expect([...detectMutatedTables("REPLACE INTO users VALUES (1)")]).toEqual(["users"]);
   });
 
   it("handles SQLite double-quoted, MySQL backtick, and SQL Server bracket identifiers", () => {
-    expect([...detectMutatedTables('INSERT INTO "users" VALUES (1)')]).toEqual([
-      "users",
-    ]);
-    expect([
-      ...detectMutatedTables("INSERT INTO `users` VALUES (1)"),
-    ]).toEqual(["users"]);
-    expect([...detectMutatedTables("INSERT INTO [users] VALUES (1)")]).toEqual([
-      "users",
-    ]);
+    expect([...detectMutatedTables('INSERT INTO "users" VALUES (1)')]).toEqual(["users"]);
+    expect([...detectMutatedTables("INSERT INTO `users` VALUES (1)")]).toEqual(["users"]);
+    expect([...detectMutatedTables("INSERT INTO [users] VALUES (1)")]).toEqual(["users"]);
   });
 
   it("handles INSERT OR REPLACE / OR IGNORE etc.", () => {
-    expect([
-      ...detectMutatedTables("INSERT OR REPLACE INTO users VALUES (1)"),
-    ]).toEqual(["users"]);
-    expect([
-      ...detectMutatedTables("UPDATE OR IGNORE users SET name = 'x'"),
-    ]).toEqual(["users"]);
+    expect([...detectMutatedTables("INSERT OR REPLACE INTO users VALUES (1)")]).toEqual(["users"]);
+    expect([...detectMutatedTables("UPDATE OR IGNORE users SET name = 'x'")]).toEqual(["users"]);
   });
 
   it("handles DROP / ALTER TABLE", () => {
     expect([...detectMutatedTables("DROP TABLE users")]).toEqual(["users"]);
-    expect([...detectMutatedTables("DROP TABLE IF EXISTS users")]).toEqual([
-      "users",
-    ]);
-    expect([
-      ...detectMutatedTables("ALTER TABLE users ADD COLUMN x INTEGER"),
-    ]).toEqual(["users"]);
+    expect([...detectMutatedTables("DROP TABLE IF EXISTS users")]).toEqual(["users"]);
+    expect([...detectMutatedTables("ALTER TABLE users ADD COLUMN x INTEGER")]).toEqual(["users"]);
   });
 
   it("returns empty set for SELECT / pragma / BEGIN", () => {
@@ -58,12 +36,8 @@ describe("detectMutatedTables", () => {
 
   it("ignores keywords inside string literals and comments (heuristic)", () => {
     // Comments get stripped, so a UPDATE inside a comment does not match.
-    expect(
-      detectMutatedTables("SELECT 1 -- UPDATE users SET x = 1").size,
-    ).toBe(0);
-    expect(
-      detectMutatedTables("SELECT 1 /* DELETE FROM users */").size,
-    ).toBe(0);
+    expect(detectMutatedTables("SELECT 1 -- UPDATE users SET x = 1").size).toBe(0);
+    expect(detectMutatedTables("SELECT 1 /* DELETE FROM users */").size).toBe(0);
   });
 
   it("finds multiple tables in a multi-statement SQL", () => {
@@ -72,11 +46,7 @@ describe("detectMutatedTables", () => {
       UPDATE posts SET title = 'x' WHERE id = 1;
       DELETE FROM comments WHERE id = 1;
     `;
-    expect([...detectMutatedTables(sql)].sort()).toEqual([
-      "comments",
-      "posts",
-      "users",
-    ]);
+    expect([...detectMutatedTables(sql)].sort()).toEqual(["comments", "posts", "users"]);
   });
 });
 

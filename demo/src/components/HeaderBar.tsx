@@ -10,10 +10,8 @@ export function HeaderBar() {
       <div>
         <div className="text-lg font-semibold leading-tight">Money Tracker</div>
         <div className="text-xs text-muted-foreground">
-          <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-            sql-reactive-orm
-          </code>{" "}
-          demo · sql.js in the browser
+          <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">sql-reactive-orm</code> demo
+          · sql.js in the browser
         </div>
       </div>
       <div className="ml-auto flex items-center gap-2">
@@ -39,11 +37,7 @@ export function HeaderBar() {
 // the header (static icons, handlers) stays stable.
 function SelectCountBadge() {
   return (
-    <Badge
-      variant="outline"
-      className="gap-1.5 font-normal tabular-nums"
-      title={stats.lastSelect}
-    >
+    <Badge variant="outline" className="gap-1.5 font-normal tabular-nums" title={stats.lastSelect}>
       <Database className="size-3" />
       <span>{stats.selectCount} SELECTs</span>
     </Badge>

@@ -83,8 +83,8 @@ function DialogRoot() {
             <DialogHeader>
               <DialogTitle>Edit transaction</DialogTitle>
               <DialogDescription>
-                Fields pre-filled synchronously from the entity cache via{" "}
-                <code>use(tx.field)</code>.
+                Fields pre-filled synchronously from the entity cache via <code>use(tx.field)</code>
+                .
               </DialogDescription>
             </DialogHeader>
             <Suspense fallback={<Skeleton className="h-72" />}>
@@ -97,8 +97,8 @@ function DialogRoot() {
             <DialogHeader>
               <DialogTitle>Transfer between accounts</DialogTitle>
               <DialogDescription>
-                Two linked transactions inserted in a BEGIN/COMMIT — the
-                reactive driver collapses it to a single refetch.
+                Two linked transactions inserted in a BEGIN/COMMIT — the reactive driver collapses
+                it to a single refetch.
               </DialogDescription>
             </DialogHeader>
             <Suspense fallback={<Skeleton className="h-72" />}>
@@ -132,8 +132,7 @@ function DialogRoot() {
             <DialogHeader>
               <DialogTitle>Categories</DialogTitle>
               <DialogDescription>
-                Deleting a category nulls out <code>categoryId</code> on its
-                transactions.
+                Deleting a category nulls out <code>categoryId</code> on its transactions.
               </DialogDescription>
             </DialogHeader>
             <Suspense fallback={<Skeleton className="h-60" />}>

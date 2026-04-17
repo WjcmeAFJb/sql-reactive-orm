@@ -1,6 +1,6 @@
 import { orm } from "@/db/orm";
 import { useLocalObservable } from "mobx-react-lite";
-import { use, type FormEvent } from "react";
+import { use, type SubmitEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +15,7 @@ import { todayISO } from "@/lib/utils";
 import { Account, Category, Transaction } from "@/db/entities";
 import { ui } from "@/ui/ui-state";
 
-export type TxFormMode =
-  | { kind: "create" }
-  | { kind: "edit"; tx: Transaction };
+export type TxFormMode = { kind: "create" } | { kind: "edit"; tx: Transaction };
 
 type Kind = "income" | "expense";
 
@@ -40,7 +38,6 @@ type FormState = {
  * itself never re-renders on keystrokes.
  */
 export function TransactionForm({ mode }: { mode: TxFormMode }) {
-  
   const accounts = use(orm.findAll(Account, { orderBy: "id" }));
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
 
@@ -58,15 +55,14 @@ export function TransactionForm({ mode }: { mode: TxFormMode }) {
   const s = useLocalObservable<FormState>(() => ({
     kind: initial && initial.amount > 0 ? "income" : "expense",
     accountId: String(initial?.accountId ?? accounts[0]?.id ?? ""),
-    categoryId:
-      initial?.categoryId != null ? String(initial.categoryId) : "none",
+    categoryId: initial?.categoryId != null ? String(initial.categoryId) : "none",
     amount: initial ? String(Math.abs(initial.amount)) : "",
     note: initial?.note ?? "",
     date: initial?.date ?? todayISO(),
     busy: false,
   }));
 
-  async function submit(e: FormEvent): Promise<void> {
+  async function submit(e: SubmitEvent): Promise<void> {
     e.preventDefault();
     const n = parseFloat(s.amount);
     if (!Number.isFinite(n)) return;
@@ -113,10 +109,7 @@ function TypeSelect({ state }: { state: FormState }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor="kind">Type</Label>
-      <Select
-        value={state.kind}
-        onValueChange={(v) => (state.kind = v as Kind)}
-      >
+      <Select value={state.kind} onValueChange={(v) => (state.kind = v as Kind)}>
         <SelectTrigger id="kind">
           <SelectValue />
         </SelectTrigger>
@@ -147,20 +140,11 @@ function AmountInput({ state }: { state: FormState }) {
   );
 }
 
-function AccountSelect({
-  state,
-  accounts,
-}: {
-  state: FormState;
-  accounts: readonly Account[];
-}) {
+function AccountSelect({ state, accounts }: { state: FormState; accounts: readonly Account[] }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor="account">Account</Label>
-      <Select
-        value={state.accountId}
-        onValueChange={(v) => (state.accountId = v)}
-      >
+      <Select value={state.accountId} onValueChange={(v) => (state.accountId = v)}>
         <SelectTrigger id="account">
           <SelectValue />
         </SelectTrigger>
@@ -184,10 +168,7 @@ function CategorySelect({
   return (
     <div className="space-y-1.5">
       <Label htmlFor="category">Category</Label>
-      <Select
-        value={state.categoryId}
-        onValueChange={(v) => (state.categoryId = v)}
-      >
+      <Select value={state.categoryId} onValueChange={(v) => (state.categoryId = v)}>
         <SelectTrigger id="category">
           <SelectValue />
         </SelectTrigger>
@@ -249,31 +230,15 @@ function Footer({ state, mode }: { state: FormState; mode: TxFormMode }) {
   );
 }
 
-function SubmitButton({
-  state,
-  mode,
-}: {
-  state: FormState;
-  mode: TxFormMode;
-}) {
+function SubmitButton({ state, mode }: { state: FormState; mode: TxFormMode }) {
   return (
     <Button type="submit" disabled={state.busy || !state.amount}>
-      {state.busy
-        ? "Saving…"
-        : mode.kind === "edit"
-          ? "Save changes"
-          : "Add transaction"}
+      {state.busy ? "Saving…" : mode.kind === "edit" ? "Save changes" : "Add transaction"}
     </Button>
   );
 }
 
-function EntityNameOption({
-  id,
-  name,
-}: {
-  id: number;
-  name: Promise<string>;
-}) {
+function EntityNameOption({ id, name }: { id: number; name: Promise<string> }) {
   return <SelectItem value={String(id)}>{use(name)}</SelectItem>;
 }
 

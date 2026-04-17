@@ -1,11 +1,5 @@
 import { Entity, installAccessors } from "./entity.js";
-import {
-  Query,
-  eagerLoad,
-  queryKey,
-  type QueryKind,
-  type QueryOptions,
-} from "./query.js";
+import { Query, eagerLoad, queryKey, type QueryKind, type QueryOptions } from "./query.js";
 import type { Driver } from "./driver.js";
 import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
@@ -20,11 +14,7 @@ import {
   type Compilable,
 } from "kysely";
 
-function sqlKey(
-  sql: string,
-  params: readonly unknown[],
-  options: SqlQueryOptions<never>,
-): string {
+function sqlKey(sql: string, params: readonly unknown[], options: SqlQueryOptions<never>): string {
   const keyBy = options.keyBy ? options.keyBy.toString() : "";
   const watch = options.watch ? [...options.watch].sort().join(",") : "";
   return `sql:${sql}:${JSON.stringify(params)}:${watch}:${keyBy}`;
@@ -124,10 +114,7 @@ export class Orm<DB = unknown> {
 
   // ---- identity map ----
 
-  _getOrCreate<T extends Entity>(
-    cls: EntityClass<T>,
-    id: unknown,
-  ): T {
+  _getOrCreate<T extends Entity>(cls: EntityClass<T>, id: unknown): T {
     const map = this._identity.get(cls.schema.name);
     if (!map)
       throw new Error(
@@ -161,10 +148,7 @@ export class Orm<DB = unknown> {
 
   // ---- subscription bus ----
 
-  _subscribe(
-    tables: ReadonlySet<string>,
-    callback: () => void,
-  ): () => void {
+  _subscribe(tables: ReadonlySet<string>, callback: () => void): () => void {
     for (const t of tables) {
       let set = this._subscribers.get(t);
       if (!set) {
@@ -310,10 +294,7 @@ export class Orm<DB = unknown> {
     return row;
   }
 
-  async _loadRelation(
-    entity: Entity,
-    rel: RelationDef,
-  ): Promise<unknown> {
+  async _loadRelation(entity: Entity, rel: RelationDef): Promise<unknown> {
     const TargetCls = rel.target();
     const targetSchema = TargetCls.schema;
     const parentSchema = entity._schema();
@@ -326,9 +307,7 @@ export class Orm<DB = unknown> {
     }
 
     const localValue =
-      rel.localKey === parentSchema.primaryKey
-        ? entity.id
-        : await entity._getField(rel.localKey);
+      rel.localKey === parentSchema.primaryKey ? entity.id : await entity._getField(rel.localKey);
     if (localValue == null) return rel.kind === "hasOne" ? null : [];
 
     const rows = await this.driver.all<Record<string, unknown>>(
@@ -340,15 +319,12 @@ export class Orm<DB = unknown> {
       inst._applyRow(row);
       return inst;
     });
-    return rel.kind === "hasOne" ? instances[0] ?? null : instances;
+    return rel.kind === "hasOne" ? (instances[0] ?? null) : instances;
   }
 
   // ---- mutations ----
 
-  async insert<T extends Entity>(
-    cls: EntityClass<T>,
-    data: Record<string, unknown>,
-  ): Promise<T> {
+  async insert<T extends Entity>(cls: EntityClass<T>, data: Record<string, unknown>): Promise<T> {
     const schema = cls.schema;
     const cols = Object.keys(data).filter((k) => k in schema.fields);
     const values = cols.map((c) => encode(schema.fields[c], data[c]));
@@ -372,21 +348,16 @@ export class Orm<DB = unknown> {
     return inst;
   }
 
-  async update<T extends Entity>(
-    entity: T,
-    patch: Record<string, unknown>,
-  ): Promise<T> {
+  async update<T extends Entity>(entity: T, patch: Record<string, unknown>): Promise<T> {
     const schema = entity._schema();
-    const cols = Object.keys(patch).filter(
-      (k) => k in schema.fields && k !== schema.primaryKey,
-    );
+    const cols = Object.keys(patch).filter((k) => k in schema.fields && k !== schema.primaryKey);
     if (cols.length === 0) return entity;
     const values = cols.map((c) => encode(schema.fields[c], patch[c]));
     const set = cols.map((c) => `"${c}" = ?`).join(", ");
-    await this.driver.run(
-      `UPDATE "${schema.table}" SET ${set} WHERE "${schema.primaryKey}" = ?`,
-      [...values, entity.id],
-    );
+    await this.driver.run(`UPDATE "${schema.table}" SET ${set} WHERE "${schema.primaryKey}" = ?`, [
+      ...values,
+      entity.id,
+    ]);
     const rows = await this.driver.all<Record<string, unknown>>(
       `SELECT * FROM "${schema.table}" WHERE "${schema.primaryKey}" = ?`,
       [entity.id],
@@ -398,27 +369,20 @@ export class Orm<DB = unknown> {
 
   async delete(entity: Entity): Promise<void> {
     const schema = entity._schema();
-    await this.driver.run(
-      `DELETE FROM "${schema.table}" WHERE "${schema.primaryKey}" = ?`,
-      [entity.id],
-    );
+    await this.driver.run(`DELETE FROM "${schema.table}" WHERE "${schema.primaryKey}" = ?`, [
+      entity.id,
+    ]);
     this._identity.get(schema.name)?.delete(entity.id);
     // Reactive driver wrapper already notified on the DELETE.
   }
 
   // ---- queries ----
 
-  findAll<T extends Entity>(
-    cls: EntityClass<T>,
-    opts: QueryOptions = {},
-  ): Query<T[]> {
+  findAll<T extends Entity>(cls: EntityClass<T>, opts: QueryOptions = {}): Query<T[]> {
     return this._getOrCreateQuery<T[]>(cls, opts, "findAll");
   }
 
-  findFirst<T extends Entity>(
-    cls: EntityClass<T>,
-    opts: QueryOptions = {},
-  ): Query<T | null> {
+  findFirst<T extends Entity>(cls: EntityClass<T>, opts: QueryOptions = {}): Query<T | null> {
     return this._getOrCreateQuery<T | null>(cls, opts, "findFirst");
   }
 

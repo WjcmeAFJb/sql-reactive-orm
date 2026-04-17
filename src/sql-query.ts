@@ -1,16 +1,9 @@
-import {
-  IObservableArray,
-  makeObservable,
-  observable,
-  runInAction,
-} from "mobx";
+import { IObservableArray, makeObservable, observable, runInAction } from "mobx";
 import type { Compilable } from "kysely";
 import type { Orm } from "./orm.js";
 
 /** Accepts either a raw SQL string or a kysely-returning callback. */
-export type SqlSource<DB, T> =
-  | string
-  | ((db: import("kysely").Kysely<DB>) => Compilable<T>);
+export type SqlSource<DB, T> = string | ((db: import("kysely").Kysely<DB>) => Compilable<T>);
 
 export interface SqlQueryOptions<T> {
   /**
@@ -71,9 +64,7 @@ export class SqlQuery<T = Record<string, unknown>> implements Promise<T[]> {
       reason: observable.ref,
     });
     const watch = new Set(
-      _options.watch && _options.watch.length > 0
-        ? _options.watch
-        : detectReadTables(_sql),
+      _options.watch && _options.watch.length > 0 ? _options.watch : detectReadTables(_sql),
     );
     if (watch.size > 0) {
       this._unsubscribe = this._orm._subscribe(watch, () => {
@@ -118,18 +109,12 @@ export class SqlQuery<T = Record<string, unknown>> implements Promise<T[]> {
   private async _execute(): Promise<T[]> {
     const id = ++this._runId;
     try {
-      const rows = await this._orm.driver.all<T & Record<string, unknown>>(
-        this._sql,
-        this._params,
-      );
+      const rows = await this._orm.driver.all<T & Record<string, unknown>>(this._sql, this._params);
       if (id !== this._runId) return rows as T[];
       runInAction(() => {
         if (this.status !== "fulfilled") {
           this.value.replace(
-            rows.map(
-              (r) =>
-                observable.object(r as Record<string, unknown>) as unknown as T,
-            ),
+            rows.map((r) => observable.object(r as Record<string, unknown>) as unknown as T),
           );
           this.status = "fulfilled";
         } else {
@@ -181,19 +166,13 @@ export function patchInto(target: unknown, incoming: unknown): unknown {
     return target;
   }
   if (Array.isArray(target) && Array.isArray(incoming)) {
-    patchArrayPositional(
-      target as unknown as IObservableArray<unknown> | unknown[],
-      incoming,
-    );
+    patchArrayPositional(target as unknown as IObservableArray<unknown> | unknown[], incoming);
     return target;
   }
   return incoming;
 }
 
-function patchObject(
-  target: Record<string, unknown>,
-  incoming: Record<string, unknown>,
-): void {
+function patchObject(target: Record<string, unknown>, incoming: Record<string, unknown>): void {
   // Remove keys that disappeared first, so observer reads during the
   // same action don't see a half-shaped object if they also read
   // newly-added keys.
@@ -214,10 +193,7 @@ function patchObject(
   }
 }
 
-function patchArrayPositional<E>(
-  target: IObservableArray<E> | E[],
-  incoming: E[],
-): void {
+function patchArrayPositional<E>(target: IObservableArray<E> | E[], incoming: E[]): void {
   const minLen = Math.min(target.length, incoming.length);
   for (let i = 0; i < minLen; i++) {
     const oV = target[i];
@@ -273,10 +249,7 @@ function patchByKey(
     const k = keyBy(row);
     const existing = byKey.get(k);
     if (existing !== undefined) {
-      patchObject(
-        existing as Record<string, unknown>,
-        row as Record<string, unknown>,
-      );
+      patchObject(existing as Record<string, unknown>, row as Record<string, unknown>);
       next[i] = existing;
       byKey.delete(k);
     } else {
@@ -304,9 +277,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-function isObservableArray<E>(
-  v: IObservableArray<E> | E[],
-): v is IObservableArray<E> {
+function isObservableArray<E>(v: IObservableArray<E> | E[]): v is IObservableArray<E> {
   return (
     typeof (v as IObservableArray<E>).replace === "function" &&
     typeof (v as IObservableArray<E>).clear === "function"
@@ -321,9 +292,7 @@ const JOIN_RE = /\bJOIN\s+("([^"]+)"|`([^`]+)`|\[([^\]]+)\]|([A-Za-z_][\w$]*))/g
 /** Heuristic: pull FROM / JOIN table names out of a SELECT. */
 export function detectReadTables(sql: string): Set<string> {
   const out = new Set<string>();
-  const stripped = sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ");
+  const stripped = sql.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
   for (const re of [FROM_RE, JOIN_RE]) {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;

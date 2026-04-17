@@ -7,10 +7,7 @@ import { Account } from "@/db/entities";
 import { ui } from "@/ui/ui-state";
 
 export function AccountList() {
-  
-  const accounts = use(
-    orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
-  );
+  const accounts = use(orm.findAll(Account, { orderBy: "id", with: { transactions: true } }));
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {accounts.map((a) => (

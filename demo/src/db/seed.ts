@@ -82,16 +82,13 @@ export async function seed(orm: Orm<any>): Promise<void> {
   }
 
   // 80 random expenses spread across the last 45 days.
-  const expenseCats = categories.filter(
-    (c) => c !== salaryCat && c !== freelanceCat,
-  );
+  const expenseCats = categories.filter((c) => c !== salaryCat && c !== freelanceCat);
   for (let i = 0; i < 80; i++) {
     const daysBack = Math.floor(rnd() * 45);
     const d = new Date();
     d.setDate(d.getDate() - daysBack);
     const cat = pick(expenseCats);
-    const amount =
-      -Math.round((3 + rnd() * 180) * 100 + (rnd() < 0.1 ? 50000 : 0)) / 100;
+    const amount = -Math.round((3 + rnd() * 180) * 100 + (rnd() < 0.1 ? 50000 : 0)) / 100;
     await orm.insert(Transaction, {
       accountId: pick(accounts).id,
       categoryId: cat.id,

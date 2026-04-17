@@ -11,30 +11,20 @@ export function AccountCard({ account }: { account: Account }) {
   const color = use(account.color);
   const initial = use(account.initialBalance);
   const txs = use(account.transactions);
-  const balance = txs.reduce(
-    (sum, t) => sum + (use(t.amount) as number),
-    initial,
-  );
+  const balance = txs.reduce((sum, t) => sum + (use(t.amount) as number), initial);
 
   return (
     <Card className="group relative overflow-hidden">
       <div className="h-1" style={{ backgroundColor: color }} />
       <CardContent className="p-5">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-          {name}
-        </div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">{name}</div>
         <div className="mt-1 flex items-end justify-between gap-2">
           <div
-            className={cn(
-              "text-2xl font-semibold tabular-nums",
-              balance < 0 && "text-destructive",
-            )}
+            className={cn("text-2xl font-semibold tabular-nums", balance < 0 && "text-destructive")}
           >
             {formatMoney(balance)}
           </div>
-          <div className="pb-1 text-xs text-muted-foreground">
-            {txs.length} tx
-          </div>
+          <div className="pb-1 text-xs text-muted-foreground">{txs.length} tx</div>
         </div>
       </CardContent>
       <Button

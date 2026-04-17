@@ -27,7 +27,7 @@ export interface TransactionRow {
 
 /** Table name → row shape map consumed by `Kysely<DB>`. */
 export interface DB {
-  "accounts": AccountRow;
-  "categories": CategoryRow;
-  "transactions": TransactionRow;
+  accounts: AccountRow;
+  categories: CategoryRow;
+  transactions: TransactionRow;
 }

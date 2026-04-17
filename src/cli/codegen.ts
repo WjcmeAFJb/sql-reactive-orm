@@ -48,9 +48,7 @@ function parseArgs(argv: readonly string[]): {
     }
   }
   if (!config || !out) {
-    console.error(
-      "Usage: sql-reactive-orm-codegen --config <orm.config.ts> --out <dir>",
-    );
+    console.error("Usage: sql-reactive-orm-codegen --config <orm.config.ts> --out <dir>");
     process.exit(1);
   }
   return {
@@ -66,9 +64,7 @@ async function loadConfig(path: string): Promise<OrmConfig> {
   };
   const config = mod.default ?? mod.config;
   if (!config || !Array.isArray(config.entities)) {
-    throw new Error(
-      `${path} must export \`{ entities: [...] }\` as its default export`,
-    );
+    throw new Error(`${path} must export \`{ entities: [...] }\` as its default export`);
   }
   return config;
 }
@@ -121,9 +117,7 @@ function emitDbTs(entities: readonly EntityClass[]): string {
     for (const f of r.fields) {
       // Quote the key when it's not a valid JS identifier so kysely's
       // inference still works for exotic column names.
-      const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(f.name)
-        ? f.name
-        : JSON.stringify(f.name);
+      const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(f.name) ? f.name : JSON.stringify(f.name);
       lines.push(`  ${key}: ${f.ts};`);
     }
     lines.push(`}`);
@@ -149,9 +143,7 @@ async function main(): Promise<void> {
   writeFileSync(dbPath, emitDbTs(config.entities));
   const rel = (p: string): string => {
     try {
-      return "./" + (p.startsWith(process.cwd())
-        ? p.slice(process.cwd().length + 1)
-        : p);
+      return "./" + (p.startsWith(process.cwd()) ? p.slice(process.cwd().length + 1) : p);
     } catch {
       return p;
     }

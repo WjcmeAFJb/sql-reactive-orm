@@ -16,6 +16,8 @@
     "test:node": "vitest run --project node",
     "test:browser": "vitest run --project browser",
     "typecheck": "tsc --noEmit",
+    "fmt": "oxfmt --write 'src/**/*.{ts,tsx}' 'test/**/*.{ts,tsx}' 'demo/src/**/*.{ts,tsx}' 'demo/orm.config.ts' 'demo/vite.config.ts' 'vitest.config.ts'",
+    "fmt:check": "oxfmt --check 'src/**/*.{ts,tsx}' 'test/**/*.{ts,tsx}' 'demo/src/**/*.{ts,tsx}' 'demo/orm.config.ts' 'demo/vite.config.ts' 'vitest.config.ts'",
     "demo": "pnpm --filter money-tracker-demo dev",
     "demo:build": "pnpm --filter money-tracker-demo build",
     "demo:codegen": "pnpm --filter money-tracker-demo codegen"
@@ -54,6 +56,7 @@
     "@vitest/browser": "^4.1.4",
     "@vitest/browser-playwright": "^4.1.4",
     "mobx-react-lite": "^4.0.7",
+    "oxfmt": "^0.45.0",
     "playwright": "^1.49.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

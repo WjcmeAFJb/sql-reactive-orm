@@ -39,7 +39,7 @@ export default defineConfig({
     target: "es2022",
   },
   server: {
-    host: '0.0.0.0',
-    allowedHosts: ['.code.internal.local']
-  }
+    host: "0.0.0.0",
+    allowedHosts: [".code.internal.local"],
+  },
 });

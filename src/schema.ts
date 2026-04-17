@@ -69,9 +69,7 @@ export const json = (opts: FieldOpts = {}): FieldDef => ({
   json: true,
 });
 
-export const primary = (
-  opts: Omit<FieldDef, "type" | "primary"> = {},
-): FieldDef => ({
+export const primary = (opts: Omit<FieldDef, "type" | "primary"> = {}): FieldDef => ({
   type: "INTEGER",
   primary: true,
   autoincrement: true,
@@ -85,12 +83,10 @@ export function generateDDL(schema: EntitySchema): string {
   for (const [name, def] of Object.entries(schema.fields)) {
     let col = `"${name}" ${def.type}`;
     if (def.primary) col += " PRIMARY KEY";
-    if (def.autoincrement && def.type === "INTEGER" && def.primary)
-      col += " AUTOINCREMENT";
+    if (def.autoincrement && def.type === "INTEGER" && def.primary) col += " AUTOINCREMENT";
     if (def.unique && !def.primary) col += " UNIQUE";
     if (!def.nullable && !def.primary) col += " NOT NULL";
-    if (def.default !== undefined)
-      col += ` DEFAULT ${JSON.stringify(def.default)}`;
+    if (def.default !== undefined) col += ` DEFAULT ${JSON.stringify(def.default)}`;
     cols.push(col);
   }
   return `CREATE TABLE IF NOT EXISTS "${schema.table}" (${cols.join(", ")})`;

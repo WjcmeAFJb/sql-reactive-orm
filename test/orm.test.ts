@@ -1,12 +1,6 @@
 import { autorun, reaction } from "mobx";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  Entity,
-  Orm,
-  isFulfilled,
-  json,
-  primary,
-} from "../src/index.js";
+import { Entity, Orm, isFulfilled, json, primary } from "../src/index.js";
 import type { EntitySchema } from "../src/index.js";
 import { createDriver } from "./helpers/driver.js";
 import { Comment, Post, User } from "./helpers/entities.js";
@@ -170,7 +164,7 @@ describe("relations", () => {
     expect(postsQueries).toBe(1);
     // Identity preserved
     expect(await postsA[0]!.title).toBe("P1");
-    expect((await (postsA[0]! as Post).author)).toBe(users[0]);
+    expect(await (postsA[0]! as Post).author).toBe(users[0]);
   });
 
   it("nested `with` loads grandchildren eagerly", async () => {
@@ -451,17 +445,8 @@ describe("orm.transaction()", () => {
     expect(results).toEqual([undefined, undefined, undefined]);
 
     // The stream must look like: BEGIN STMT* COMMIT BEGIN STMT* COMMIT …
-    const keywords = stmts.filter(
-      (s) => s === "BEGIN" || s === "COMMIT" || s === "ROLLBACK",
-    );
-    expect(keywords).toEqual([
-      "BEGIN",
-      "COMMIT",
-      "BEGIN",
-      "COMMIT",
-      "BEGIN",
-      "COMMIT",
-    ]);
+    const keywords = stmts.filter((s) => s === "BEGIN" || s === "COMMIT" || s === "ROLLBACK");
+    expect(keywords).toEqual(["BEGIN", "COMMIT", "BEGIN", "COMMIT", "BEGIN", "COMMIT"]);
 
     // All five rows landed.
     const all = await orm.findAll(User, {
@@ -508,10 +493,7 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
 
     // An "unrelated library" — represented here just by a hand-written
     // statement — mutates through the ORM's driver. No orm.update call.
-    await orm.driver.run('UPDATE "users" SET name = ? WHERE id = ?', [
-      "Bob",
-      u.id,
-    ]);
+    await orm.driver.run('UPDATE "users" SET name = ? WHERE id = ?', ["Bob", u.id]);
     await new Promise((r) => setTimeout(r, 0));
     await q;
     expect(await (q.value![0] as User).name).toBe("Bob");
@@ -523,10 +505,7 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     await q;
     expect(q.value).toEqual([]);
 
-    await orm.driver.run(
-      'INSERT INTO "users" (name, email) VALUES (?, ?)',
-      ["Carol", "c@x"],
-    );
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', ["Carol", "c@x"]);
     await new Promise((r) => setTimeout(r, 0));
     await q;
     expect(q.value).toHaveLength(1);
@@ -577,10 +556,10 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     // the user likes, and trust that the ORM will invalidate on its own.
     class UserWithRename extends User {
       async rename(newName: string): Promise<void> {
-        await this._orm.driver.run(
-          'UPDATE "users" SET name = ? WHERE id = ?',
-          [newName, this.id as number],
-        );
+        await this._orm.driver.run('UPDATE "users" SET name = ? WHERE id = ?', [
+          newName,
+          this.id as number,
+        ]);
       }
     }
     Object.assign(UserWithRename, { schema: User.schema });
@@ -618,18 +597,9 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     };
 
     await orm.driver.run("BEGIN");
-    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
-      "B",
-      "b@x",
-    ]);
-    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
-      "C",
-      "c@x",
-    ]);
-    await orm.driver.run('UPDATE "users" SET name = ? WHERE name = ?', [
-      "A2",
-      "A",
-    ]);
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', ["B", "b@x"]);
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', ["C", "c@x"]);
+    await orm.driver.run('UPDATE "users" SET name = ? WHERE name = ?', ["A2", "A"]);
     expect(runs).toBe(0);
     await orm.driver.run("COMMIT");
     // The three mutations collapse into exactly one refetch.
@@ -650,10 +620,7 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     };
 
     await orm.driver.run("BEGIN");
-    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
-      "X",
-      "x@x",
-    ]);
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', ["X", "x@x"]);
     await orm.driver.run("ROLLBACK");
     await new Promise((r) => setTimeout(r, 0));
     expect(runs).toBe(0);
@@ -673,10 +640,7 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     };
 
     // Write via the raw driver — no subscribers should fire.
-    await orm.rawDriver.run(
-      'INSERT INTO "users" (name, email) VALUES (?, ?)',
-      ["Ghost", "g@x"],
-    );
+    await orm.rawDriver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', ["Ghost", "g@x"]);
     await new Promise((r) => setTimeout(r, 0));
     expect(runs).toBe(0);
 

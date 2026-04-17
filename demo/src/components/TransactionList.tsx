@@ -1,11 +1,6 @@
 import { orm } from "@/db/orm";
 import { use } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TransactionRow } from "./TransactionRow";
 import { Transaction } from "@/db/entities";
 
@@ -25,9 +20,7 @@ export function TransactionList() {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle>Transactions</CardTitle>
-          <span className="text-xs text-muted-foreground">
-            {rows.length} total
-          </span>
+          <span className="text-xs text-muted-foreground">{rows.length} total</span>
         </div>
       </CardHeader>
       <CardContent className="p-0">

@@ -28,7 +28,6 @@ const COLORS = [
 ];
 
 export function CategoriesDialog() {
-  
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
   const s = useLocalObservable(() => ({
     editingId: null as number | null,
@@ -44,11 +43,7 @@ export function CategoriesDialog() {
         <div className="max-h-[360px] overflow-y-auto -mx-6 px-6">
           {categories.map((c) =>
             s.editingId === c.id ? (
-              <EditCategoryRow
-                key={c.id}
-                category={c}
-                onDone={() => (s.editingId = null)}
-              />
+              <EditCategoryRow key={c.id} category={c} onDone={() => (s.editingId = null)} />
             ) : (
               <CategoryRow
                 key={c.id}
@@ -80,10 +75,7 @@ function CategoryRow({
 
   return (
     <div className="flex items-center gap-3 py-1.5">
-      <div
-        className="size-3 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
-      />
+      <div className="size-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">{name}</div>
         <div className="text-xs text-muted-foreground">
@@ -98,11 +90,7 @@ function CategoryRow({
         size="icon"
         className="text-muted-foreground hover:text-destructive"
         onClick={() => {
-          if (
-            confirm(
-              `Delete "${name}"? Transactions using it will become uncategorized.`,
-            )
-          )
+          if (confirm(`Delete "${name}"? Transactions using it will become uncategorized.`))
             onDelete();
         }}
       >
@@ -118,14 +106,7 @@ type EditFormState = {
   kind: "income" | "expense";
 };
 
-function EditCategoryRow({
-  category,
-  onDone,
-}: {
-  category: Category;
-  onDone: () => void;
-}) {
-  
+function EditCategoryRow({ category, onDone }: { category: Category; onDone: () => void }) {
   const s = useLocalObservable<EditFormState>(() => ({
     name: use(category.name) as string,
     color: use(category.color) as string,
@@ -161,7 +142,6 @@ function EditCategoryRow({
 type NewFormState = EditFormState;
 
 function NewCategoryRow() {
-  
   const s = useLocalObservable<NewFormState>(() => ({
     name: "",
     color: COLORS[0]!,
@@ -181,10 +161,7 @@ function NewCategoryRow() {
   }
 
   return (
-    <form
-      onSubmit={save}
-      className="flex items-center gap-2 rounded-md border border-dashed p-2"
-    >
+    <form onSubmit={save} className="flex items-center gap-2 rounded-md border border-dashed p-2">
       <ColorDot value={s.color} onChange={(c) => (s.color = c)} />
       <NewNameField state={s} />
       <KindField state={s} />
@@ -217,10 +194,7 @@ function NewNameField({ state }: { state: NewFormState }) {
 
 function KindField({ state }: { state: { kind: "income" | "expense" } }) {
   return (
-    <Select
-      value={state.kind}
-      onValueChange={(v) => (state.kind = v as typeof state.kind)}
-    >
+    <Select value={state.kind} onValueChange={(v) => (state.kind = v as typeof state.kind)}>
       <SelectTrigger className="h-8 w-28">
         <SelectValue />
       </SelectTrigger>
@@ -240,13 +214,7 @@ function NewSubmit({ state }: { state: NewFormState }) {
   );
 }
 
-function ColorDot({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function ColorDot({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const s = useLocalObservable(() => ({ open: false }));
   return (
     <div className="relative">
@@ -270,10 +238,7 @@ function ColorDot({
                 onChange(c);
                 s.open = false;
               }}
-              className={cn(
-                "size-5 rounded-full",
-                c === value && "ring-2 ring-[--color-ring]",
-              )}
+              className={cn("size-5 rounded-full", c === value && "ring-2 ring-[--color-ring]")}
               style={{ backgroundColor: c }}
             />
           ))}

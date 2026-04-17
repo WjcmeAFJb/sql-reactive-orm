@@ -9,10 +9,7 @@ async function getWasmBinary(): Promise<ArrayBuffer> {
   if (isBrowser) {
     // Vite serves `public/` at the origin root during tests.
     const res = await fetch("/sql-wasm.wasm");
-    if (!res.ok)
-      throw new Error(
-        `Failed to fetch /sql-wasm.wasm: ${res.status} ${res.statusText}`,
-      );
+    if (!res.ok) throw new Error(`Failed to fetch /sql-wasm.wasm: ${res.status} ${res.statusText}`);
     cachedWasm = await res.arrayBuffer();
     return cachedWasm;
   }
@@ -21,10 +18,7 @@ async function getWasmBinary(): Promise<ArrayBuffer> {
   const req = createRequire(import.meta.url);
   const wasmPath = req.resolve("sql.js/dist/sql-wasm.wasm");
   const buf = readFileSync(wasmPath);
-  cachedWasm = buf.buffer.slice(
-    buf.byteOffset,
-    buf.byteOffset + buf.byteLength,
-  ) as ArrayBuffer;
+  cachedWasm = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
   return cachedWasm;
 }
 

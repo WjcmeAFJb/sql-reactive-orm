@@ -38,7 +38,6 @@ const SAMPLES: { label: string; sql: string }[] = [
 ];
 
 export function SqlConsole() {
-  
   const s = useLocalObservable<ConsoleState>(() => ({
     sql: SAMPLES[0]!.sql,
     result: { kind: "idle" },
@@ -106,11 +105,7 @@ function ConsoleHeader() {
           routed through <code>orm.driver</code> — mutations auto-refresh the UI
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => ui.setSqlConsoleOpen(false)}
-      >
+      <Button variant="ghost" size="icon" onClick={() => ui.setSqlConsoleOpen(false)}>
         <ChevronsDown className="size-4" />
       </Button>
     </div>
@@ -171,13 +166,7 @@ function Editor({
   );
 }
 
-function ConsoleFooter({
-  state,
-  onRun,
-}: {
-  state: ConsoleState;
-  onRun: () => Promise<void>;
-}) {
+function ConsoleFooter({ state, onRun }: { state: ConsoleState; onRun: () => Promise<void> }) {
   return (
     <div className="flex items-center justify-between border-t border-[--color-border] px-3 py-2">
       <div className="text-[11px] text-muted-foreground">
@@ -195,13 +184,7 @@ function ConsoleFooter({
   );
 }
 
-function RunButton({
-  state,
-  onRun,
-}: {
-  state: ConsoleState;
-  onRun: () => Promise<void>;
-}) {
+function RunButton({ state, onRun }: { state: ConsoleState; onRun: () => Promise<void> }) {
   return (
     <Button size="sm" onClick={() => void onRun()} disabled={state.busy}>
       <Play className="size-3.5" />
@@ -215,8 +198,8 @@ function ResultView({ state }: { state: ConsoleState }) {
   if (result.kind === "idle") {
     return (
       <div className="min-h-20 overflow-auto border-t border-[--color-border] px-3 py-4 text-xs text-muted-foreground">
-        Results appear here. Try a SELECT to preview rows, or run an UPDATE and
-        watch the cards above refresh on their own.
+        Results appear here. Try a SELECT to preview rows, or run an UPDATE and watch the cards
+        above refresh on their own.
       </div>
     );
   }
@@ -238,9 +221,7 @@ function ResultView({ state }: { state: ConsoleState }) {
           <span className="text-muted-foreground">
             {" "}
             · lastInsertRowid ={" "}
-            <code className="tabular-nums">
-              {String(result.lastInsertRowid)}
-            </code>
+            <code className="tabular-nums">{String(result.lastInsertRowid)}</code>
           </span>
         )}
       </div>
@@ -271,10 +252,7 @@ function ResultView({ state }: { state: ConsoleState }) {
           {rows.map((r, i) => (
             <tr key={i} className={cn("border-t border-[--color-border]/60")}>
               {cols.map((c) => (
-                <td
-                  key={c}
-                  className="px-3 py-1 tabular-nums text-muted-foreground"
-                >
+                <td key={c} className="px-3 py-1 tabular-nums text-muted-foreground">
                   {formatCell(r[c])}
                 </td>
               ))}

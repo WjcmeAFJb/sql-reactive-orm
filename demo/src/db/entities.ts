@@ -120,10 +120,9 @@ export class Category extends Entity {
   async remove(): Promise<void> {
     await this._orm.transaction(async () => {
       const d = this._orm.driver;
-      await d.run(
-        'UPDATE "transactions" SET "categoryId" = NULL WHERE "categoryId" = ?',
-        [this.id],
-      );
+      await d.run('UPDATE "transactions" SET "categoryId" = NULL WHERE "categoryId" = ?', [
+        this.id,
+      ]);
       await d.run('DELETE FROM "categories" WHERE "id" = ?', [this.id]);
     });
   }
@@ -171,10 +170,7 @@ export class Transaction extends Entity {
       return;
     }
     await this._orm.transaction(async () => {
-      await this._orm.driver.run(
-        'DELETE FROM "transactions" WHERE "transferId" = ?',
-        [transferId],
-      );
+      await this._orm.driver.run('DELETE FROM "transactions" WHERE "transferId" = ?', [transferId]);
     });
   }
 }

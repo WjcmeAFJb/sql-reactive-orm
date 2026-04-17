@@ -1,12 +1,7 @@
 import { use } from "react";
 import { sql } from "kysely";
 import { orm } from "@/db/orm";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatMoney } from "@/lib/utils";
 
 /**
@@ -52,9 +47,7 @@ export function CategoryBreakdown() {
         {rows.length === 0 ? (
           <div className="text-sm text-muted-foreground">No expenses yet.</div>
         ) : (
-          rows.map((r) => (
-            <BreakdownRow key={r.id} row={r} grandTotal={grandTotal} />
-          ))
+          rows.map((r) => <BreakdownRow key={r.id} row={r} grandTotal={grandTotal} />)
         )}
       </CardContent>
     </Card>
@@ -74,21 +67,13 @@ function BreakdownRow({
     <div className="space-y-1">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <div
-            className="size-2 rounded-full"
-            style={{ backgroundColor: row.color }}
-          />
+          <div className="size-2 rounded-full" style={{ backgroundColor: row.color }} />
           <span>{row.name}</span>
         </div>
-        <span className="tabular-nums text-muted-foreground">
-          {formatMoney(abs)}
-        </span>
+        <span className="tabular-nums text-muted-foreground">{formatMoney(abs)}</span>
       </div>
       <div className="h-1.5 rounded bg-muted overflow-hidden">
-        <div
-          className={cn("h-full")}
-          style={{ width: `${pct}%`, backgroundColor: row.color }}
-        />
+        <div className={cn("h-full")} style={{ width: `${pct}%`, backgroundColor: row.color }} />
       </div>
     </div>
   );
