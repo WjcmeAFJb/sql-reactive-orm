@@ -381,6 +381,107 @@ describe("orm.clearCaches()", () => {
   });
 });
 
+describe("orm.transaction()", () => {
+  it("runs statements atomically and fires one batched notification at COMMIT", async () => {
+    const q = orm.findAll(User, { orderBy: "id" });
+    await q;
+
+    let runs = 0;
+    const internal = q as unknown as { _execute(): void };
+    const origExecute = internal._execute.bind(internal);
+    internal._execute = () => {
+      runs++;
+      origExecute();
+    };
+
+    await orm.transaction(async () => {
+      await orm.insert(User, { name: "A", email: "a@x" });
+      await orm.insert(User, { name: "B", email: "b@x" });
+      await orm.insert(User, { name: "C", email: "c@x" });
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(runs).toBe(1);
+    await q.promise;
+    expect(q.value).toHaveLength(3);
+    q.dispose();
+  });
+
+  it("rolls back on thrown error", async () => {
+    await expect(
+      orm.transaction(async () => {
+        await orm.insert(User, { name: "should-vanish", email: "x@x" });
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    const all = await orm.findAll(User);
+    expect(all.find((u) => orm.peek(User, u.id) === u && u)).toBeUndefined();
+    const match = await orm.findAll(User, { where: { email: "x@x" } });
+    expect(match).toHaveLength(0);
+  });
+
+  it("serialises concurrent callers — no interleaved BEGINs", async () => {
+    // Instrument the wrapper-facing driver to record the raw statement
+    // stream and prove that each BEGIN is followed by its own COMMIT
+    // before the next BEGIN appears.
+    const stmts: string[] = [];
+    const origRun = orm.driver.run.bind(orm.driver);
+    orm.driver.run = (async (sql: string, params?: readonly unknown[]) => {
+      const head = sql.trim().split(/\s+/)[0]!.toUpperCase();
+      if (head === "BEGIN" || head === "COMMIT" || head === "ROLLBACK") {
+        stmts.push(head);
+      } else {
+        stmts.push("STMT");
+      }
+      return origRun(sql, params);
+    }) as typeof orm.driver.run;
+
+    const results = await Promise.all([
+      orm.transaction(async () => {
+        await orm.insert(User, { name: "T1-a", email: "t1a@x" });
+        await orm.insert(User, { name: "T1-b", email: "t1b@x" });
+      }),
+      orm.transaction(async () => {
+        await orm.insert(User, { name: "T2-a", email: "t2a@x" });
+        await orm.insert(User, { name: "T2-b", email: "t2b@x" });
+      }),
+      orm.transaction(async () => {
+        await orm.insert(User, { name: "T3-a", email: "t3a@x" });
+      }),
+    ]);
+    expect(results).toEqual([undefined, undefined, undefined]);
+
+    // The stream must look like: BEGIN STMT* COMMIT BEGIN STMT* COMMIT …
+    const keywords = stmts.filter(
+      (s) => s === "BEGIN" || s === "COMMIT" || s === "ROLLBACK",
+    );
+    expect(keywords).toEqual([
+      "BEGIN",
+      "COMMIT",
+      "BEGIN",
+      "COMMIT",
+      "BEGIN",
+      "COMMIT",
+    ]);
+
+    // All five rows landed.
+    const all = await orm.findAll(User, {
+      where: { email: { like: "t%@x" } },
+      orderBy: "id",
+    });
+    expect(all).toHaveLength(5);
+  });
+
+  it("concurrent non-transaction writes interleave fine", async () => {
+    await Promise.all([
+      orm.insert(User, { name: "P1", email: "p1@x" }),
+      orm.insert(User, { name: "P2", email: "p2@x" }),
+      orm.insert(User, { name: "P3", email: "p3@x" }),
+    ]);
+    const all = await orm.findAll(User, { where: { email: { like: "p%@x" } } });
+    expect(all).toHaveLength(3);
+  });
+});
+
 describe("orm.settle()", () => {
   it("waits for post-mutation row + relation refreshes to land", async () => {
     const u = await orm.insert(User, { name: "A", email: "a@x" });

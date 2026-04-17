@@ -48,6 +48,13 @@ export class Orm {
   private readonly _subscribers = new Map<string, Set<() => void>>();
   private readonly _pendingRefreshes = new Set<Promise<unknown>>();
   /**
+   * Mutex-as-promise-chain for `transaction()`. Each caller awaits the
+   * previous caller's completion before issuing its BEGIN. Guarantees
+   * SQLite's single-transaction-per-connection invariant holds under
+   * concurrent callers.
+   */
+  private _txChain: Promise<void> = Promise.resolve();
+  /**
    * Cache of live `Query` objects keyed by (kind, entity, stable-opts).
    * The point is that `orm.findAll(Transaction, { … })` typed inline
    * inside a component's render returns the *same* Query object every
@@ -409,6 +416,54 @@ export class Orm {
     const q = new Query<T>(this, cls, opts, kind);
     this._queryCache.set(key, q as unknown as Query<unknown>);
     return q;
+  }
+
+  /**
+   * Run `fn` inside a SQL transaction. Concurrent calls are serialised
+   * — if two calls overlap, the second waits for the first to COMMIT
+   * (or ROLLBACK) before starting its own BEGIN. This is the only way
+   * to safely run multi-statement mutations when the caller can't
+   * guarantee there's no other in-flight write, since SQLite has
+   * exactly one transaction slot per connection.
+   *
+   * All writes through `this.driver` — including the ORM's own
+   * `insert` / `update` / `delete` and arbitrary `driver.run(...)`
+   * from inside `fn` — participate in the same transaction. The
+   * reactive wrapper defers notifications for the duration; one
+   * batched invalidation fires at COMMIT. Throwing from `fn` triggers
+   * ROLLBACK and propagates the error.
+   *
+   * Do **not** nest `orm.transaction` calls in each other — the outer
+   * call holds the mutex and the inner would deadlock. Open a single
+   * transaction and call plain `this.driver.run` inside.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const ticket = new Promise<void>((r) => {
+      release = r;
+    });
+    const wait = this._txChain;
+    this._txChain = ticket;
+    try {
+      await wait;
+      await this.driver.run("BEGIN");
+      try {
+        const result = await fn();
+        await this.driver.run("COMMIT");
+        return result;
+      } catch (e) {
+        try {
+          await this.driver.run("ROLLBACK");
+        } catch {
+          // Rollback after a failed COMMIT can itself fail on some
+          // connection states; the original error is what the caller
+          // cares about.
+        }
+        throw e;
+      }
+    } finally {
+      release();
+    }
   }
 
   async close(): Promise<void> {

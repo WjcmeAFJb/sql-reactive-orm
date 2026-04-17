@@ -51,22 +51,19 @@ export class Account extends Entity {
 
   /** Delete this account and cascade to its transactions. */
   async remove(): Promise<void> {
-    const d = this._orm.driver;
-    await d.run("BEGIN");
-    try {
+    await this._orm.transaction(async () => {
+      const d = this._orm.driver;
       await d.run('DELETE FROM "transactions" WHERE "accountId" = ?', [this.id]);
       await d.run('DELETE FROM "accounts" WHERE "id" = ?', [this.id]);
-      await d.run("COMMIT");
-    } catch (e) {
-      await d.run("ROLLBACK");
-      throw e;
-    }
+    });
   }
 
   /**
    * Move money from this account to `to`. Inserts two linked
-   * transactions (opposite signs, shared `transferId`) in one
-   * BEGIN/COMMIT so the UI refreshes once.
+   * transactions (opposite signs, shared `transferId`). The enclosing
+   * `transaction()` both atomicises the pair *and* serialises it with
+   * any other in-flight `transferTo` / `remove` — SQLite's single
+   * transaction slot stays well-defined under concurrent callers.
    */
   async transferTo(
     to: Account,
@@ -77,9 +74,7 @@ export class Account extends Entity {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `t-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const d = this._orm.driver;
-    await d.run("BEGIN");
-    try {
+    await this._orm.transaction(async () => {
       await this._orm.insert(Transaction, {
         accountId: this.id,
         categoryId: null,
@@ -96,11 +91,7 @@ export class Account extends Entity {
         date: data.date,
         transferId,
       });
-      await d.run("COMMIT");
-    } catch (e) {
-      await d.run("ROLLBACK");
-      throw e;
-    }
+    });
   }
 }
 
@@ -127,19 +118,14 @@ export class Category extends Entity {
 
   /** Delete this category. Transactions using it become uncategorized. */
   async remove(): Promise<void> {
-    const d = this._orm.driver;
-    await d.run("BEGIN");
-    try {
+    await this._orm.transaction(async () => {
+      const d = this._orm.driver;
       await d.run(
         'UPDATE "transactions" SET "categoryId" = NULL WHERE "categoryId" = ?',
         [this.id],
       );
       await d.run('DELETE FROM "categories" WHERE "id" = ?', [this.id]);
-      await d.run("COMMIT");
-    } catch (e) {
-      await d.run("ROLLBACK");
-      throw e;
-    }
+    });
   }
 }
 
@@ -184,16 +170,11 @@ export class Transaction extends Entity {
       await this._orm.delete(this);
       return;
     }
-    const d = this._orm.driver;
-    await d.run("BEGIN");
-    try {
-      await d.run('DELETE FROM "transactions" WHERE "transferId" = ?', [
-        transferId,
-      ]);
-      await d.run("COMMIT");
-    } catch (e) {
-      await d.run("ROLLBACK");
-      throw e;
-    }
+    await this._orm.transaction(async () => {
+      await this._orm.driver.run(
+        'DELETE FROM "transactions" WHERE "transferId" = ?',
+        [transferId],
+      );
+    });
   }
 }
