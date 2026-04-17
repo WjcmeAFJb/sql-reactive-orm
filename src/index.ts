@@ -38,3 +38,4 @@ export { belongsTo, hasMany, hasOne } from "./relations.js";
 export { resolved, rejected, track, isFulfilled } from "./promise-utils.js";
 export type { TrackedPromise } from "./promise-utils.js";
 export type { Driver, RunResult } from "./driver.js";
+export { wrapReactive, detectMutatedTables } from "./reactive-driver.js";

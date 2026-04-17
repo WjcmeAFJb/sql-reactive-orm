@@ -218,6 +218,40 @@ describe("react: waterfall avoidance via `with`", () => {
   });
 });
 
+describe("react: reactive to raw SQL — Entity methods with hand-written statements", () => {
+  it("an entity method running raw SQL re-renders observing components", async () => {
+    // Subclass User with a custom mutation method. The ORM doesn't know
+    // anything about `rename` — it just sees an UPDATE go through its
+    // driver and refreshes subscribed queries / observers.
+    class UserX extends User {
+      async rename(next: string): Promise<void> {
+        await this._orm.driver.run(
+          'UPDATE "users" SET name = ? WHERE id = ?',
+          [next, this.id as number],
+        );
+      }
+    }
+    Object.assign(UserX, { schema: User.schema });
+    const u = await orm.insert(UserX, { name: "Alice", email: "a@x" });
+
+    const screen = await render(
+      <Suspense fallback={<span>loading</span>}>
+        <UserName user={u} />
+      </Suspense>,
+    );
+    await expect
+      .element(screen.getByTestId(`name-${u.id}`))
+      .toHaveTextContent("Alice");
+
+    // The ORM was never told that a mutation happened; the reactive
+    // driver wrapper detected the UPDATE and invalidated on its own.
+    await u.rename("Bob");
+    await expect
+      .element(screen.getByTestId(`name-${u.id}`))
+      .toHaveTextContent("Bob");
+  });
+});
+
 describe("react: identity map guarantees stable instances across renders", () => {
   it("two components receive the same instance; both re-render on update", async () => {
     const u = await orm.insert(User, { name: "Alice", email: "a@x" });

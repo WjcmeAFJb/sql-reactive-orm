@@ -361,3 +361,194 @@ describe("where: null", () => {
     expect(nulls).toHaveLength(1);
   });
 });
+
+describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () => {
+  it("raw UPDATE through orm.driver refreshes an open query", async () => {
+    const u = await orm.insert(User, { name: "Alice", email: "a@x" });
+    const q = orm.findAll(User, { orderBy: "id" });
+    await q;
+    expect(await (q.result![0] as User).name).toBe("Alice");
+
+    // An "unrelated library" — represented here just by a hand-written
+    // statement — mutates through the ORM's driver. No orm.update call.
+    await orm.driver.run('UPDATE "users" SET name = ? WHERE id = ?', [
+      "Bob",
+      u.id,
+    ]);
+    await new Promise((r) => setTimeout(r, 0));
+    await q.promise;
+    expect(await (q.result![0] as User).name).toBe("Bob");
+    q.dispose();
+  });
+
+  it("raw INSERT through orm.driver surfaces the new row in a findAll query", async () => {
+    const q = orm.findAll(User, { orderBy: "id" });
+    await q;
+    expect(q.result).toEqual([]);
+
+    await orm.driver.run(
+      'INSERT INTO "users" (name, email) VALUES (?, ?)',
+      ["Carol", "c@x"],
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    await q.promise;
+    expect(q.result).toHaveLength(1);
+    expect(await q.result![0]!.name).toBe("Carol");
+    q.dispose();
+  });
+
+  it("raw DELETE through orm.driver drops the row from an open query", async () => {
+    const u = await orm.insert(User, { name: "A", email: "a@x" });
+    await orm.insert(User, { name: "B", email: "b@x" });
+    const q = orm.findAll(User, { orderBy: "id" });
+    await q;
+    expect(q.result).toHaveLength(2);
+
+    await orm.driver.run('DELETE FROM "users" WHERE id = ?', [u.id]);
+    await new Promise((r) => setTimeout(r, 0));
+    await q.promise;
+    expect(q.result).toHaveLength(1);
+    q.dispose();
+  });
+
+  it("raw exec of multi-statement DDL notifies every table touched", async () => {
+    const u = await orm.insert(User, { name: "A", email: "a@x" });
+    await orm.insert(Post, { title: "P1", authorId: u.id });
+
+    const qu = orm.findAll(User);
+    const qp = orm.findAll(Post);
+    await qu;
+    await qp;
+    expect(qu.result).toHaveLength(1);
+    expect(qp.result).toHaveLength(1);
+
+    await orm.driver.exec(`
+      DELETE FROM "posts";
+      DELETE FROM "users";
+    `);
+    await new Promise((r) => setTimeout(r, 0));
+    await Promise.all([qu.promise, qp.promise]);
+    expect(qu.result).toHaveLength(0);
+    expect(qp.result).toHaveLength(0);
+    qu.dispose();
+    qp.dispose();
+  });
+
+  it("Entity method running raw SQL keeps consumers reactive", async () => {
+    // Demonstrate the intended pattern: put the mutation in a method on
+    // the entity, have it call `this._orm.driver.run(...)` with any SQL
+    // the user likes, and trust that the ORM will invalidate on its own.
+    class UserWithRename extends User {
+      async rename(newName: string): Promise<void> {
+        await this._orm.driver.run(
+          'UPDATE "users" SET name = ? WHERE id = ?',
+          [newName, this.id as number],
+        );
+      }
+    }
+    Object.assign(UserWithRename, { schema: User.schema });
+
+    const u = await orm.insert(UserWithRename, {
+      name: "Alice",
+      email: "a@x",
+    });
+    const q = orm.findAll(UserWithRename, { orderBy: "id" });
+    await q;
+    expect(await (q.result![0] as User).name).toBe("Alice");
+
+    await u.rename("Bob");
+    await new Promise((r) => setTimeout(r, 0));
+    await q.promise;
+    expect(await (q.result![0] as User).name).toBe("Bob");
+
+    // The instance itself also updates since the findAll refetch re-applies
+    // the row onto the same identity-map instance.
+    expect(await u.name).toBe("Bob");
+    q.dispose();
+  });
+
+  it("transaction batches multiple writes into one notification per table", async () => {
+    await orm.insert(User, { name: "A", email: "a@x" });
+    const q = orm.findAll(User, { orderBy: "id" });
+    await q;
+
+    let runs = 0;
+    const internal = q as unknown as { _execute(): void };
+    const origExecute = internal._execute.bind(internal);
+    internal._execute = () => {
+      runs++;
+      origExecute();
+    };
+
+    await orm.driver.run("BEGIN");
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
+      "B",
+      "b@x",
+    ]);
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
+      "C",
+      "c@x",
+    ]);
+    await orm.driver.run('UPDATE "users" SET name = ? WHERE name = ?', [
+      "A2",
+      "A",
+    ]);
+    expect(runs).toBe(0);
+    await orm.driver.run("COMMIT");
+    // The three mutations collapse into exactly one refetch.
+    expect(runs).toBe(1);
+    q.dispose();
+  });
+
+  it("ROLLBACK suppresses the notification entirely", async () => {
+    const q = orm.findAll(User);
+    await q;
+
+    let runs = 0;
+    const internal = q as unknown as { _execute(): void };
+    const origExecute = internal._execute.bind(internal);
+    internal._execute = () => {
+      runs++;
+      origExecute();
+    };
+
+    await orm.driver.run("BEGIN");
+    await orm.driver.run('INSERT INTO "users" (name, email) VALUES (?, ?)', [
+      "X",
+      "x@x",
+    ]);
+    await orm.driver.run("ROLLBACK");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(runs).toBe(0);
+    q.dispose();
+  });
+
+  it("orm.rawDriver bypasses reactivity (escape hatch)", async () => {
+    const q = orm.findAll(User);
+    await q;
+
+    let runs = 0;
+    const internal = q as unknown as { _execute(): void };
+    const origExecute = internal._execute.bind(internal);
+    internal._execute = () => {
+      runs++;
+      origExecute();
+    };
+
+    // Write via the raw driver — no subscribers should fire.
+    await orm.rawDriver.run(
+      'INSERT INTO "users" (name, email) VALUES (?, ?)',
+      ["Ghost", "g@x"],
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(runs).toBe(0);
+
+    // Explicit manual notification wakes subscribers back up.
+    orm.invalidate("users");
+    await new Promise((r) => setTimeout(r, 0));
+    await q.promise;
+    expect(runs).toBe(1);
+    expect(q.result).toHaveLength(1);
+    q.dispose();
+  });
+});

@@ -150,8 +150,23 @@ export abstract class Entity {
    * re-render. Pending field reads for the old row are discarded — they
    * will have resolved (or will resolve) to old-row values, which is
    * acceptable: new reads get fresh data via the new row.
+   *
+   * If the new row is shallow-equal to the current one, skip the write
+   * entirely: `_row` is an `observable.ref`, so assigning a fresh object
+   * with the same column values would still fan out a MobX notification
+   * and re-render every observing component for no real change. That
+   * matters here because the ORM can legitimately call `_applyRow` more
+   * than once per mutation (e.g. `orm.update` re-reads the row *and* the
+   * post-write identity-map refresh in `_notifyTable` re-reads it).
    */
   _applyRow(row: Record<string, unknown>): void {
+    if (this._row !== null && rowsShallowEqual(this._row, row)) {
+      runInAction(() => {
+        this._rowLoad = null;
+        this._pendingFieldCache.clear();
+      });
+      return;
+    }
     runInAction(() => {
       this._row = row;
       this._pendingFieldCache.clear();
@@ -215,6 +230,20 @@ export abstract class Entity {
     if (def.boolean) return !!raw;
     return raw;
   }
+}
+
+function rowsShallowEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  const ak = Object.keys(a);
+  const bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
 }
 
 /**

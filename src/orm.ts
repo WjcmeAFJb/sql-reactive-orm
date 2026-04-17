@@ -1,6 +1,7 @@
 import { Entity, installAccessors } from "./entity.js";
 import { Query, type QueryOptions } from "./query.js";
 import type { Driver } from "./driver.js";
+import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
 import type { EntityClass, FieldDef, RelationDef } from "./schema.js";
 
@@ -20,13 +21,31 @@ function encode(def: FieldDef, value: unknown): unknown {
  *   - a table mutation bus (Queries subscribe; relations listen for invalidation)
  */
 export class Orm {
+  /**
+   * Reactive driver: any `run` / `exec` through this driver that looks
+   * like a mutation (INSERT / UPDATE / DELETE / REPLACE / DROP TABLE /
+   * ALTER TABLE) automatically invalidates queries and relations that
+   * touch the affected tables. Use this for custom Entity methods that
+   * emit raw SQL — the ORM stays reactive without you having to tell it
+   * what you did.
+   */
   readonly driver: Driver;
+  /**
+   * The un-wrapped driver, kept as an escape hatch. Writes through this
+   * do NOT fire any invalidation. Use for bulk loads, migrations, or any
+   * other case where you explicitly want the ORM to remain oblivious.
+   */
+  readonly rawDriver: Driver;
+
   private readonly _entities = new Map<string, EntityClass<Entity>>();
   private readonly _identity = new Map<string, Map<unknown, Entity>>();
   private readonly _subscribers = new Map<string, Set<() => void>>();
 
   constructor(driver: Driver) {
-    this.driver = driver;
+    this.rawDriver = driver;
+    this.driver = wrapReactive(driver, (tables) => {
+      for (const t of tables) this._notifyTable(t);
+    });
   }
 
   /**
@@ -91,10 +110,31 @@ export class Orm {
   }
 
   /**
-   * Signal that `table` changed. Notifies all subscribed queries and
-   * invalidates relations on cached entities whose target is `table`.
+   * Manually signal that `table` changed — use this when you've bypassed
+   * `orm.driver` entirely (different sql.js connection, a query builder
+   * with its own handle, etc.) so the ORM still knows to refetch.
+   */
+  invalidate(table: string): void {
+    this._notifyTable(table);
+  }
+
+  /**
+   * Signal that `table` changed. Kicks three things in order:
+   *   1. A batched row-refresh for every cached entity instance in
+   *      `table`. This is what makes direct-entity observers (not going
+   *      through a Query) reactive to raw SQL — `entity._row` is an
+   *      observable ref, so `_applyRow` on the latest DB state triggers
+   *      any `observer`-wrapped component reading a field on it. Fires
+   *      a single `SELECT … WHERE id IN (...)` regardless of cache size.
+   *   2. The Query subscription bus: any findAll / findFirst watching
+   *      this table re-executes.
+   *   3. Relation invalidation: drop cached relation promises on
+   *      entities whose schema has a relation targeting `table`, so the
+   *      next relation read re-queries.
    */
   _notifyTable(table: string): void {
+    void this._refreshCachedRowsFor(table);
+
     const subs = this._subscribers.get(table);
     if (subs) for (const cb of [...subs]) cb();
 
@@ -110,6 +150,45 @@ export class Orm {
       const map = this._identity.get(entityName);
       if (!map) continue;
       for (const inst of map.values()) inst._invalidateRelations(table);
+    }
+  }
+
+  private async _refreshCachedRowsFor(table: string): Promise<void> {
+    for (const [entityName, cls] of this._entities) {
+      if (cls.schema.table !== table) continue;
+      const map = this._identity.get(entityName);
+      if (!map || map.size === 0) continue;
+      const schema = cls.schema;
+      const ids = [...map.keys()];
+      const placeholders = ids.map(() => "?").join(",");
+      let rows: Record<string, unknown>[];
+      try {
+        rows = await this.driver.all<Record<string, unknown>>(
+          `SELECT * FROM "${schema.table}" WHERE "${schema.primaryKey}" IN (${placeholders})`,
+          ids,
+        );
+      } catch {
+        // Don't let a background refresh failure cascade — a caller
+        // may be in the middle of dropping the table, for instance.
+        return;
+      }
+      const byId = new Map<unknown, Record<string, unknown>>();
+      for (const r of rows) byId.set(r[schema.primaryKey], r);
+      // Only touch entities that were in the snapshot — a concurrent
+      // `_getOrCreate` (e.g. from orm.insert returning immediately after
+      // the wrapper fired notify) may have added new ids to the map
+      // *after* we captured `ids`; those rows weren't part of this
+      // refresh's SELECT and must not be considered missing.
+      for (const id of ids) {
+        const inst = map.get(id);
+        if (!inst) continue;
+        const row = byId.get(id);
+        if (row) {
+          inst._applyRow(row);
+        } else {
+          map.delete(id);
+        }
+      }
     }
   }
 
@@ -185,7 +264,8 @@ export class Orm {
       [id],
     );
     if (rows[0]) inst._applyRow(rows[0]);
-    this._notifyTable(schema.table);
+    // No explicit notifyTable: the reactive driver wrapper already fired
+    // when `driver.run(INSERT ...)` returned above.
     return inst;
   }
 
@@ -209,7 +289,7 @@ export class Orm {
       [entity.id],
     );
     if (rows[0]) entity._applyRow(rows[0]);
-    this._notifyTable(schema.table);
+    // Reactive driver wrapper already notified on the UPDATE.
     return entity;
   }
 
@@ -220,7 +300,7 @@ export class Orm {
       [entity.id],
     );
     this._identity.get(schema.name)?.delete(entity.id);
-    this._notifyTable(schema.table);
+    // Reactive driver wrapper already notified on the DELETE.
   }
 
   // ---- queries ----
