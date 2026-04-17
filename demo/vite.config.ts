@@ -34,6 +34,10 @@ export default defineConfig({
     include: ["sql.js"],
     exclude: ["sql-reactive-orm"],
   },
+  build: {
+    // Top-level await in `db/orm.ts` needs a target that supports it.
+    target: "es2022",
+  },
   server: {
     host: '0.0.0.0',
     allowedHosts: ['.code.internal.local']
