@@ -61,4 +61,10 @@ async function init(): Promise<Orm> {
   return orm;
 }
 
-export const ormPromise = init();
+/**
+ * Top-level await: Vite lets us block the module graph on DB init so
+ * every downstream import sees a ready-to-use `orm`. No `useOrm()`
+ * hook, no `<OrmProvider>`, no `use(ormPromise)` — components just
+ * `import { orm }` and go.
+ */
+export const orm = await init();

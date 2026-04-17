@@ -1,4 +1,5 @@
-import { observer, useLocalObservable } from "mobx-react-lite";
+import { orm } from "@/db/orm";
+import { useLocalObservable } from "mobx-react-lite";
 import { use, type FormEvent } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Category } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 import { deleteCategory } from "@/db/actions";
 
 const COLORS = [
@@ -28,8 +28,8 @@ const COLORS = [
   "#3b82f6",
 ];
 
-export const CategoriesDialog = observer(function CategoriesDialog() {
-  const orm = useOrm();
+export function CategoriesDialog() {
+  
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
   const s = useLocalObservable(() => ({
     editingId: null as number | null,
@@ -63,9 +63,9 @@ export const CategoriesDialog = observer(function CategoriesDialog() {
       </div>
     </div>
   );
-});
+}
 
-const CategoryRow = observer(function CategoryRow({
+function CategoryRow({
   category,
   onEdit,
   onDelete,
@@ -111,17 +111,23 @@ const CategoryRow = observer(function CategoryRow({
       </Button>
     </div>
   );
-});
+}
 
-const EditCategoryRow = observer(function EditCategoryRow({
+type EditFormState = {
+  name: string;
+  color: string;
+  kind: "income" | "expense";
+};
+
+function EditCategoryRow({
   category,
   onDone,
 }: {
   category: Category;
   onDone: () => void;
 }) {
-  const orm = useOrm();
-  const s = useLocalObservable(() => ({
+  
+  const s = useLocalObservable<EditFormState>(() => ({
     name: use(category.name) as string,
     color: use(category.color) as string,
     kind: use(category.kind) as "income" | "expense",
@@ -141,24 +147,8 @@ const EditCategoryRow = observer(function EditCategoryRow({
   return (
     <form onSubmit={save} className="flex items-center gap-2 py-1.5">
       <ColorDot value={s.color} onChange={(c) => (s.color = c)} />
-      <Input
-        value={s.name}
-        onChange={(e) => (s.name = e.target.value)}
-        className="h-8 flex-1"
-        autoFocus
-      />
-      <Select
-        value={s.kind}
-        onValueChange={(v) => (s.kind = v as typeof s.kind)}
-      >
-        <SelectTrigger className="h-8 w-28">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="expense">Expense</SelectItem>
-          <SelectItem value="income">Income</SelectItem>
-        </SelectContent>
-      </Select>
+      <NameField state={s} />
+      <KindField state={s} />
       <Button type="submit" size="icon" variant="ghost">
         <Check className="size-4" />
       </Button>
@@ -167,14 +157,16 @@ const EditCategoryRow = observer(function EditCategoryRow({
       </Button>
     </form>
   );
-});
+}
 
-const NewCategoryRow = observer(function NewCategoryRow() {
-  const orm = useOrm();
-  const s = useLocalObservable(() => ({
+type NewFormState = EditFormState;
+
+function NewCategoryRow() {
+  
+  const s = useLocalObservable<NewFormState>(() => ({
     name: "",
     color: COLORS[0]!,
-    kind: "expense" as "income" | "expense",
+    kind: "expense",
   }));
 
   async function save(e: FormEvent): Promise<void> {
@@ -195,32 +187,61 @@ const NewCategoryRow = observer(function NewCategoryRow() {
       className="flex items-center gap-2 rounded-md border border-dashed p-2"
     >
       <ColorDot value={s.color} onChange={(c) => (s.color = c)} />
-      <Input
-        value={s.name}
-        onChange={(e) => (s.name = e.target.value)}
-        placeholder="New category name"
-        className="h-8 flex-1"
-      />
-      <Select
-        value={s.kind}
-        onValueChange={(v) => (s.kind = v as typeof s.kind)}
-      >
-        <SelectTrigger className="h-8 w-28">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="expense">Expense</SelectItem>
-          <SelectItem value="income">Income</SelectItem>
-        </SelectContent>
-      </Select>
-      <Button type="submit" size="icon" disabled={!s.name.trim()}>
-        <Plus className="size-4" />
-      </Button>
+      <NewNameField state={s} />
+      <KindField state={s} />
+      <NewSubmit state={s} />
     </form>
   );
-});
+}
 
-const ColorDot = observer(function ColorDot({
+function NameField({ state }: { state: EditFormState }) {
+  return (
+    <Input
+      value={state.name}
+      onChange={(e) => (state.name = e.target.value)}
+      className="h-8 flex-1"
+      autoFocus
+    />
+  );
+}
+
+function NewNameField({ state }: { state: NewFormState }) {
+  return (
+    <Input
+      value={state.name}
+      onChange={(e) => (state.name = e.target.value)}
+      placeholder="New category name"
+      className="h-8 flex-1"
+    />
+  );
+}
+
+function KindField({ state }: { state: { kind: "income" | "expense" } }) {
+  return (
+    <Select
+      value={state.kind}
+      onValueChange={(v) => (state.kind = v as typeof state.kind)}
+    >
+      <SelectTrigger className="h-8 w-28">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="expense">Expense</SelectItem>
+        <SelectItem value="income">Income</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function NewSubmit({ state }: { state: NewFormState }) {
+  return (
+    <Button type="submit" size="icon" disabled={!state.name.trim()}>
+      <Plus className="size-4" />
+    </Button>
+  );
+}
+
+function ColorDot({
   value,
   onChange,
 }: {
@@ -261,4 +282,4 @@ const ColorDot = observer(function ColorDot({
       )}
     </div>
   );
-});
+}

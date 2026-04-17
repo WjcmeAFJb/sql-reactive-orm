@@ -1,4 +1,4 @@
-import { observer } from "mobx-react-lite";
+import { orm } from "@/db/orm";
 import { use } from "react";
 import {
   Card,
@@ -8,10 +8,9 @@ import {
 } from "@/components/ui/card";
 import { TransactionRow } from "./TransactionRow";
 import { Transaction } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 
-export const TransactionList = observer(function TransactionList() {
-  const orm = useOrm();
+export function TransactionList() {
+  
   const rows = use(
     orm.findAll(Transaction, {
       orderBy: [
@@ -47,4 +46,4 @@ export const TransactionList = observer(function TransactionList() {
       </CardContent>
     </Card>
   );
-});
+}

@@ -1,16 +1,16 @@
-import { observer } from "mobx-react-lite";
+import { orm } from "@/db/orm";
 import { use } from "react";
 import { formatMoney } from "@/lib/utils";
 import { Account } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 
 /**
- * Summed balance across all accounts. Ten lines. No reducer, no
- * selector, no manual memoization — MobX re-renders this component
- * whenever any of the fields it reads moves, nothing else.
+ * Summed balance across all accounts. Reads every account's initial
+ * balance and every transaction's amount; the auto-observer Babel
+ * plugin wraps this so any of those changes re-renders exactly this
+ * number.
  */
-export const TotalBalance = observer(function TotalBalance() {
-  const orm = useOrm();
+export function TotalBalance() {
+  
   const accounts = use(
     orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
   );
@@ -29,4 +29,4 @@ export const TotalBalance = observer(function TotalBalance() {
       </span>
     </div>
   );
-});
+}

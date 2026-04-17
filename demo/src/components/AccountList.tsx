@@ -1,14 +1,13 @@
-import { observer } from "mobx-react-lite";
+import { orm } from "@/db/orm";
 import { use } from "react";
 import { Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { AccountCard } from "./AccountCard";
 import { Account } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 import { ui } from "@/ui/ui-state";
 
-export const AccountList = observer(function AccountList() {
-  const orm = useOrm();
+export function AccountList() {
+  
   const accounts = use(
     orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
   );
@@ -30,4 +29,4 @@ export const AccountList = observer(function AccountList() {
       </Card>
     </div>
   );
-});
+}

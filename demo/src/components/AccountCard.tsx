@@ -1,4 +1,3 @@
-import { observer } from "mobx-react-lite";
 import { use } from "react";
 import { Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,11 +6,7 @@ import { cn, formatMoney } from "@/lib/utils";
 import { Account } from "@/db/entities";
 import { ui } from "@/ui/ui-state";
 
-export const AccountCard = observer(function AccountCard({
-  account,
-}: {
-  account: Account;
-}) {
+export function AccountCard({ account }: { account: Account }) {
   const name = use(account.name);
   const color = use(account.color);
   const initial = use(account.initialBalance);
@@ -53,4 +48,4 @@ export const AccountCard = observer(function AccountCard({
       </Button>
     </Card>
   );
-});
+}

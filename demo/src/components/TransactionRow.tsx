@@ -1,20 +1,15 @@
-import { observer } from "mobx-react-lite";
+import { orm } from "@/db/orm";
 import { use } from "react";
 import { ArrowLeftRight, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 import { Transaction } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 import { deleteTransaction } from "@/db/actions";
 import { ui } from "@/ui/ui-state";
 
-export const TransactionRow = observer(function TransactionRow({
-  tx,
-}: {
-  tx: Transaction;
-}) {
-  const orm = useOrm();
+export function TransactionRow({ tx }: { tx: Transaction }) {
+  
   const amount = use(tx.amount);
   const note = use(tx.note);
   const date = use(tx.date);
@@ -93,4 +88,4 @@ export const TransactionRow = observer(function TransactionRow({
       </div>
     </div>
   );
-});
+}

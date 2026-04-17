@@ -1,7 +1,4 @@
-import { Suspense, use } from "react";
-import { observer } from "mobx-react-lite";
-import { ormPromise } from "@/db/orm";
-import { OrmProvider } from "@/db/orm-context";
+import { Suspense } from "react";
 import { ui } from "@/ui/ui-state";
 import { HeaderBar } from "@/components/HeaderBar";
 import { AccountList } from "@/components/AccountList";
@@ -28,51 +25,45 @@ import { Skeleton } from "@/components/ui/skeleton";
  * below (which is the only thing observing `ui.dialog`) updates.
  */
 export function App() {
-  const orm = use(ormPromise);
   return (
-    <OrmProvider value={orm}>
-      <div className="min-h-screen bg-muted/30">
-        <HeaderBar />
+    <div className="min-h-screen bg-muted/30">
+      <HeaderBar />
 
-        <main className="mx-auto w-full max-w-6xl space-y-6 px-6 py-6 pb-24">
-          <Suspense fallback={<Skeleton className="h-10 w-64" />}>
-            <TotalBalance />
+      <main className="mx-auto w-full max-w-6xl space-y-6 px-6 py-6 pb-24">
+        <Suspense fallback={<Skeleton className="h-10 w-64" />}>
+          <TotalBalance />
+        </Suspense>
+
+        <Suspense
+          fallback={
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+            </div>
+          }
+        >
+          <AccountList />
+        </Suspense>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_20rem]">
+          <Suspense fallback={<Skeleton className="h-80" />}>
+            <TransactionList />
           </Suspense>
-
-          <Suspense
-            fallback={
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-                <Skeleton className="h-24" />
-              </div>
-            }
-          >
-            <AccountList />
+          <Suspense fallback={<Skeleton className="h-80" />}>
+            <CategoryBreakdown />
           </Suspense>
+        </div>
+      </main>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_20rem]">
-            <Suspense fallback={<Skeleton className="h-80" />}>
-              <TransactionList />
-            </Suspense>
-            <Suspense fallback={<Skeleton className="h-80" />}>
-              <CategoryBreakdown />
-            </Suspense>
-          </div>
-        </main>
-
-        <DialogRoot />
-        <SqlConsole />
-      </div>
-    </OrmProvider>
+      <DialogRoot />
+      <SqlConsole />
+    </div>
   );
 }
 
-/**
- * The only part of the app that reads `ui.dialog`. Re-renders on every
- * open / close — the rest of the tree is oblivious.
- */
-const DialogRoot = observer(function DialogRoot() {
+/** Only thing that reads `ui.dialog`; the rest of the tree is oblivious. */
+function DialogRoot() {
   const d = ui.dialog;
   return (
     <Dialog open={d.kind !== "none"} onOpenChange={(o) => !o && ui.close()}>
@@ -153,4 +144,4 @@ const DialogRoot = observer(function DialogRoot() {
       </DialogContent>
     </Dialog>
   );
-});
+}

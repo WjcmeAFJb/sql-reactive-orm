@@ -1,13 +1,25 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
+import observerPlugin from "mobx-react-observer/babel-plugin";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [react(), tailwind()],
+  plugins: [
+    react({
+      babel: {
+        // Auto-wraps every function component in `observer` at build
+        // time — so nothing in the app needs an explicit `observer()`
+        // call. The shadcn UI primitives don't read MobX state, so we
+        // skip them to avoid paying the observer overhead for nothing.
+        plugins: [observerPlugin({ exclude: ["src/components/ui/**"] })],
+      },
+    }),
+    tailwind(),
+  ],
   resolve: {
     alias: [
       // Point the demo at the in-repo ORM source so edits flow through

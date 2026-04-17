@@ -1,12 +1,11 @@
-import { observer } from "mobx-react-lite";
+import { orm } from "@/db/orm";
 import { use } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatMoney } from "@/lib/utils";
 import { Category, Transaction } from "@/db/entities";
-import { useOrm } from "@/db/orm-context";
 
-export const CategoryBreakdown = observer(function CategoryBreakdown() {
-  const orm = useOrm();
+export function CategoryBreakdown() {
+  
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
   const txs = use(
     orm.findAll(Transaction, {
@@ -81,4 +80,4 @@ export const CategoryBreakdown = observer(function CategoryBreakdown() {
       </CardContent>
     </Card>
   );
-});
+}
