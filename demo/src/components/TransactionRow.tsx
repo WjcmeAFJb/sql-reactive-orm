@@ -60,36 +60,38 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
           {accountName} · {formatDate(date)}
         </div>
       </div>
-      <div
-        className={cn(
-          "shrink-0 text-sm font-semibold tabular-nums",
-          amount < 0 ? "text-destructive" : "text-success",
-        )}
-      >
-        {amount > 0 ? "+" : ""}
-        {formatMoney(amount)}
-      </div>
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        {!isTransfer && (
+      <div className="flex shrink-0 flex-col items-end justify-between gap-1">
+        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {!isTransfer && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => ui.openEditTx(tx)}
+              aria-label="Edit transaction"
+              className="size-6 text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => ui.openEditTx(tx)}
-            aria-label="Edit transaction"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => void deleteTransaction(orm, tx)}
+            aria-label="Delete transaction"
+            className="size-6 text-muted-foreground hover:text-destructive"
           >
-            <Pencil className="size-4" />
+            <Trash2 className="size-3.5" />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => void deleteTransaction(orm, tx)}
-          aria-label="Delete transaction"
-          className="shrink-0 text-muted-foreground hover:text-destructive"
+        </div>
+        <div
+          className={cn(
+            "text-sm font-semibold tabular-nums",
+            amount < 0 ? "text-destructive" : "text-success",
+          )}
         >
-          <Trash2 className="size-4" />
-        </Button>
+          {amount > 0 ? "+" : ""}
+          {formatMoney(amount)}
+        </div>
       </div>
     </div>
   );
