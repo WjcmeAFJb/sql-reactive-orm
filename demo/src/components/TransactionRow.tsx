@@ -1,11 +1,9 @@
-import { orm } from "@/db/orm";
 import { use } from "react";
 import { ArrowLeftRight, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
 import { Transaction } from "@/db/entities";
-import { deleteTransaction } from "@/db/actions";
 import { ui } from "@/ui/ui-state";
 
 export function TransactionRow({ tx }: { tx: Transaction }) {
@@ -70,7 +68,7 @@ export function TransactionRow({ tx }: { tx: Transaction }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => void deleteTransaction(orm, tx)}
+            onClick={() => void tx.remove()}
             aria-label="Delete transaction"
             className="size-6 text-muted-foreground hover:text-destructive"
           >

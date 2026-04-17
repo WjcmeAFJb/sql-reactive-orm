@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Account } from "@/db/entities";
-import { deleteAccount } from "@/db/actions";
 import { ui } from "@/ui/ui-state";
 
 export type AccountFormMode =
@@ -84,7 +83,7 @@ export function AccountForm({ mode }: { mode: AccountFormMode }) {
       return;
     s.busy = true;
     try {
-      await deleteAccount(orm, mode.account);
+      await mode.account.remove();
       ui.close();
     } finally {
       s.busy = false;

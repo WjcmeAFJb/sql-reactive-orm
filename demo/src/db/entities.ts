@@ -14,6 +14,18 @@ import {
  * here once. No per-query fragment, no manual selection set, no
  * memoization primitives — components just read `account.name`,
  * `tx.category`, `category.color` and the ORM figures out what to load.
+ *
+ * Mutations that don't fit a single `orm.insert / update / delete`
+ * call (cascades, transfers) live as methods on the entities, so the
+ * rest of the app talks to entities as plain JS objects:
+ *
+ *   await tx.remove()
+ *   await account.remove()
+ *   await checking.transferTo(savings, { amount: 100, … })
+ *
+ * Each method batches its statements through `this._orm.driver` inside
+ * a BEGIN/COMMIT; the reactive driver wrapper fans out a single
+ * invalidation at commit time.
  */
 
 export class Account extends Entity {
@@ -36,6 +48,60 @@ export class Account extends Entity {
   declare color: Promise<string>;
   declare initialBalance: Promise<number>;
   declare transactions: Promise<Transaction[]>;
+
+  /** Delete this account and cascade to its transactions. */
+  async remove(): Promise<void> {
+    const d = this._orm.driver;
+    await d.run("BEGIN");
+    try {
+      await d.run('DELETE FROM "transactions" WHERE "accountId" = ?', [this.id]);
+      await d.run('DELETE FROM "accounts" WHERE "id" = ?', [this.id]);
+      await d.run("COMMIT");
+    } catch (e) {
+      await d.run("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /**
+   * Move money from this account to `to`. Inserts two linked
+   * transactions (opposite signs, shared `transferId`) in one
+   * BEGIN/COMMIT so the UI refreshes once.
+   */
+  async transferTo(
+    to: Account,
+    data: { amount: number; note: string | null; date: string },
+  ): Promise<void> {
+    const abs = Math.abs(data.amount);
+    const transferId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `t-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const d = this._orm.driver;
+    await d.run("BEGIN");
+    try {
+      await this._orm.insert(Transaction, {
+        accountId: this.id,
+        categoryId: null,
+        amount: -abs,
+        note: data.note,
+        date: data.date,
+        transferId,
+      });
+      await this._orm.insert(Transaction, {
+        accountId: to.id,
+        categoryId: null,
+        amount: abs,
+        note: data.note,
+        date: data.date,
+        transferId,
+      });
+      await d.run("COMMIT");
+    } catch (e) {
+      await d.run("ROLLBACK");
+      throw e;
+    }
+  }
 }
 
 export class Category extends Entity {
@@ -58,6 +124,23 @@ export class Category extends Entity {
   declare color: Promise<string>;
   declare kind: Promise<"income" | "expense">;
   declare transactions: Promise<Transaction[]>;
+
+  /** Delete this category. Transactions using it become uncategorized. */
+  async remove(): Promise<void> {
+    const d = this._orm.driver;
+    await d.run("BEGIN");
+    try {
+      await d.run(
+        'UPDATE "transactions" SET "categoryId" = NULL WHERE "categoryId" = ?',
+        [this.id],
+      );
+      await d.run('DELETE FROM "categories" WHERE "id" = ?', [this.id]);
+      await d.run("COMMIT");
+    } catch (e) {
+      await d.run("ROLLBACK");
+      throw e;
+    }
+  }
 }
 
 export class Transaction extends Entity {
@@ -90,4 +173,27 @@ export class Transaction extends Entity {
   declare transferId: Promise<string | null>;
   declare account: Promise<Account>;
   declare category: Promise<Category | null>;
+
+  /**
+   * Delete this transaction. If it's one leg of a transfer, both legs
+   * are removed atomically so we don't leave an orphan.
+   */
+  async remove(): Promise<void> {
+    const transferId = await this.transferId;
+    if (transferId == null) {
+      await this._orm.delete(this);
+      return;
+    }
+    const d = this._orm.driver;
+    await d.run("BEGIN");
+    try {
+      await d.run('DELETE FROM "transactions" WHERE "transferId" = ?', [
+        transferId,
+      ]);
+      await d.run("COMMIT");
+    } catch (e) {
+      await d.run("ROLLBACK");
+      throw e;
+    }
+  }
 }

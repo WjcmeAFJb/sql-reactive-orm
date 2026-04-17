@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Category } from "@/db/entities";
-import { deleteCategory } from "@/db/actions";
 
 const COLORS = [
   "#16a34a",
@@ -55,7 +54,7 @@ export function CategoriesDialog() {
                 key={c.id}
                 category={c}
                 onEdit={() => (s.editingId = c.id)}
-                onDelete={() => void deleteCategory(orm, c)}
+                onDelete={() => void c.remove()}
               />
             ),
           )}

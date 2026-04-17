@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { todayISO } from "@/lib/utils";
 import { Account } from "@/db/entities";
-import { transferBetween } from "@/db/actions";
 import { ui } from "@/ui/ui-state";
 
 type FormState = {
@@ -42,11 +41,12 @@ export function TransferForm() {
     e.preventDefault();
     const n = parseFloat(s.amount);
     if (!Number.isFinite(n) || s.fromId === s.toId) return;
+    const from = accounts.find((a) => String(a.id) === s.fromId);
+    const to = accounts.find((a) => String(a.id) === s.toId);
+    if (!from || !to) return;
     s.busy = true;
     try {
-      await transferBetween(orm, {
-        fromAccountId: Number(s.fromId),
-        toAccountId: Number(s.toId),
+      await from.transferTo(to, {
         amount: Math.abs(n),
         note: s.note || null,
         date: s.date,
