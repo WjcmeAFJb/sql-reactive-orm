@@ -3,20 +3,9 @@ import { ArrowLeftRight, Database, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { stats } from "@/db/orm";
+import { ui } from "@/ui/ui-state";
 
-/**
- * App header. Live SELECT counter + entry points for the three
- * top-level mutations (new tx / transfer / manage categories).
- */
-export const HeaderBar = observer(function HeaderBar({
-  onAddTx,
-  onTransfer,
-  onCategories,
-}: {
-  onAddTx: () => void;
-  onTransfer: () => void;
-  onCategories: () => void;
-}) {
+export const HeaderBar = observer(function HeaderBar() {
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-[--color-border] bg-background px-6 py-4">
       <div>
@@ -37,15 +26,15 @@ export const HeaderBar = observer(function HeaderBar({
           <Database className="size-3" />
           <span>{stats.selectCount} SELECTs</span>
         </Badge>
-        <Button variant="outline" size="sm" onClick={onCategories}>
+        <Button variant="outline" size="sm" onClick={() => ui.openCategories()}>
           <Tag className="size-4" />
           Categories
         </Button>
-        <Button variant="outline" size="sm" onClick={onTransfer}>
+        <Button variant="outline" size="sm" onClick={() => ui.openTransfer()}>
           <ArrowLeftRight className="size-4" />
           Transfer
         </Button>
-        <Button size="sm" onClick={onAddTx}>
+        <Button size="sm" onClick={() => ui.openNewTx()}>
           <Plus className="size-4" />
           Add transaction
         </Button>

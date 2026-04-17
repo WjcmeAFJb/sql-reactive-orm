@@ -7,13 +7,12 @@ import { cn, formatDate, formatMoney } from "@/lib/utils";
 import { Transaction } from "@/db/entities";
 import { useOrm } from "@/db/orm-context";
 import { deleteTransaction } from "@/db/actions";
+import { ui } from "@/ui/ui-state";
 
 export const TransactionRow = observer(function TransactionRow({
   tx,
-  onEdit,
 }: {
   tx: Transaction;
-  onEdit: () => void;
 }) {
   const orm = useOrm();
   const amount = use(tx.amount);
@@ -45,7 +44,10 @@ export const TransactionRow = observer(function TransactionRow({
               : (note ?? categoryName ?? "Uncategorized")}
           </span>
           {isTransfer ? (
-            <Badge variant="secondary" className="gap-1 text-[10px] font-normal">
+            <Badge
+              variant="secondary"
+              className="gap-1 text-[10px] font-normal"
+            >
               <ArrowLeftRight className="size-3" /> transfer
             </Badge>
           ) : note && categoryName ? (
@@ -72,7 +74,7 @@ export const TransactionRow = observer(function TransactionRow({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onEdit}
+            onClick={() => ui.openEditTx(tx)}
             aria-label="Edit transaction"
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >

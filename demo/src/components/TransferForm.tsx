@@ -1,5 +1,5 @@
-import { observer } from "mobx-react-lite";
-import { use, useState, type FormEvent } from "react";
+import { observer, useLocalObservable } from "mobx-react-lite";
+import { use, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,40 +14,37 @@ import { todayISO } from "@/lib/utils";
 import { Account } from "@/db/entities";
 import { useOrm } from "@/db/orm-context";
 import { transferBetween } from "@/db/actions";
+import { ui } from "@/ui/ui-state";
 
-export const TransferForm = observer(function TransferForm({
-  onDone,
-}: {
-  onDone: () => void;
-}) {
+export const TransferForm = observer(function TransferForm() {
   const orm = useOrm();
   const accounts = use(orm.findAll(Account, { orderBy: "id" }));
 
-  const [fromId, setFromId] = useState(String(accounts[0]?.id ?? ""));
-  const [toId, setToId] = useState(
-    String(accounts[1]?.id ?? accounts[0]?.id ?? ""),
-  );
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(todayISO());
-  const [busy, setBusy] = useState(false);
+  const s = useLocalObservable(() => ({
+    fromId: String(accounts[0]?.id ?? ""),
+    toId: String(accounts[1]?.id ?? accounts[0]?.id ?? ""),
+    amount: "",
+    note: "",
+    date: todayISO(),
+    busy: false,
+  }));
 
   async function submit(e: FormEvent): Promise<void> {
     e.preventDefault();
-    const n = parseFloat(amount);
-    if (!Number.isFinite(n) || fromId === toId) return;
-    setBusy(true);
+    const n = parseFloat(s.amount);
+    if (!Number.isFinite(n) || s.fromId === s.toId) return;
+    s.busy = true;
     try {
       await transferBetween(orm, {
-        fromAccountId: Number(fromId),
-        toAccountId: Number(toId),
+        fromAccountId: Number(s.fromId),
+        toAccountId: Number(s.toId),
         amount: Math.abs(n),
-        note: note || null,
-        date,
+        note: s.note || null,
+        date: s.date,
       });
-      onDone();
+      ui.close();
     } finally {
-      setBusy(false);
+      s.busy = false;
     }
   }
 
@@ -56,7 +53,7 @@ export const TransferForm = observer(function TransferForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="from">From</Label>
-          <Select value={fromId} onValueChange={setFromId}>
+          <Select value={s.fromId} onValueChange={(v) => (s.fromId = v)}>
             <SelectTrigger id="from">
               <SelectValue />
             </SelectTrigger>
@@ -69,13 +66,13 @@ export const TransferForm = observer(function TransferForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="to">To</Label>
-          <Select value={toId} onValueChange={setToId}>
+          <Select value={s.toId} onValueChange={(v) => (s.toId = v)}>
             <SelectTrigger id="to">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {accounts
-                .filter((a) => String(a.id) !== fromId)
+                .filter((a) => String(a.id) !== s.fromId)
                 .map((a) => (
                   <AccountOption key={a.id} id={a.id} name={a.name} />
                 ))}
@@ -91,8 +88,8 @@ export const TransferForm = observer(function TransferForm({
           type="number"
           step="0.01"
           min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          value={s.amount}
+          onChange={(e) => (s.amount = e.target.value)}
           placeholder="0.00"
           required
         />
@@ -104,8 +101,8 @@ export const TransferForm = observer(function TransferForm({
           <Input
             id="date"
             type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={s.date}
+            onChange={(e) => (s.date = e.target.value)}
             required
           />
         </div>
@@ -114,19 +111,22 @@ export const TransferForm = observer(function TransferForm({
           <Input
             id="note"
             type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
+            value={s.note}
+            onChange={(e) => (s.note = e.target.value)}
             placeholder="Optional"
           />
         </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="ghost" onClick={onDone}>
+        <Button type="button" variant="ghost" onClick={() => ui.close()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={busy || !amount || fromId === toId}>
-          {busy ? "Saving…" : "Move money"}
+        <Button
+          type="submit"
+          disabled={s.busy || !s.amount || s.fromId === s.toId}
+        >
+          {s.busy ? "Saving…" : "Move money"}
         </Button>
       </div>
     </form>

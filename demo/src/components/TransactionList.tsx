@@ -10,11 +10,7 @@ import { TransactionRow } from "./TransactionRow";
 import { Transaction } from "@/db/entities";
 import { useOrm } from "@/db/orm-context";
 
-export const TransactionList = observer(function TransactionList({
-  onEdit,
-}: {
-  onEdit: (tx: Transaction) => void;
-}) {
+export const TransactionList = observer(function TransactionList() {
   const orm = useOrm();
   const rows = use(
     orm.findAll(Transaction, {
@@ -44,11 +40,7 @@ export const TransactionList = observer(function TransactionList({
         ) : (
           <div className="divide-y divide-[--color-border]">
             {rows.map((tx) => (
-              <TransactionRow
-                key={tx.id}
-                tx={tx}
-                onEdit={() => onEdit(tx)}
-              />
+              <TransactionRow key={tx.id} tx={tx} />
             ))}
           </div>
         )}

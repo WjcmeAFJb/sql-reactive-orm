@@ -1,9 +1,10 @@
-import { observer } from "mobx-react-lite";
-import { useRef, useState, type KeyboardEvent } from "react";
+import { observer, useLocalObservable } from "mobx-react-lite";
+import { useRef, type KeyboardEvent } from "react";
 import { ChevronsDown, Play, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useOrm } from "@/db/orm-context";
+import { ui } from "@/ui/ui-state";
 
 type SqlResult =
   | { kind: "idle" }
@@ -32,35 +33,36 @@ const SAMPLES: { label: string; sql: string }[] = [
 
 export const SqlConsole = observer(function SqlConsole() {
   const orm = useOrm();
-  const [open, setOpen] = useState(false);
-  const [sql, setSql] = useState(SAMPLES[0]!.sql);
-  const [result, setResult] = useState<SqlResult>({ kind: "idle" });
-  const [busy, setBusy] = useState(false);
+  const s = useLocalObservable(() => ({
+    sql: SAMPLES[0]!.sql,
+    result: { kind: "idle" } as SqlResult,
+    busy: false,
+  }));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function run(): Promise<void> {
-    const trimmed = sql.trim().replace(/;+\s*$/, "");
+    const trimmed = s.sql.trim().replace(/;+\s*$/, "");
     if (!trimmed) return;
-    setBusy(true);
+    s.busy = true;
     try {
       if (/^(SELECT|PRAGMA|EXPLAIN|WITH)\b/i.test(trimmed)) {
         const rows = await orm.driver.all<Record<string, unknown>>(trimmed);
-        setResult({ kind: "rows", rows });
+        s.result = { kind: "rows", rows };
       } else {
         const res = await orm.driver.run(trimmed);
-        setResult({
+        s.result = {
           kind: "ok",
           changes: res.changes,
           lastInsertRowid: res.lastInsertRowid,
-        });
+        };
       }
     } catch (e) {
-      setResult({
+      s.result = {
         kind: "error",
         message: e instanceof Error ? e.message : String(e),
-      });
+      };
     } finally {
-      setBusy(false);
+      s.busy = false;
     }
   }
 
@@ -74,18 +76,17 @@ export const SqlConsole = observer(function SqlConsole() {
       const el = textareaRef.current!;
       const start = el.selectionStart;
       const end = el.selectionEnd;
-      const next = sql.slice(0, start) + "  " + sql.slice(end);
-      setSql(next);
+      s.sql = s.sql.slice(0, start) + "  " + s.sql.slice(end);
       queueMicrotask(() => {
         el.selectionStart = el.selectionEnd = start + 2;
       });
     }
   }
 
-  if (!open) {
+  if (!ui.sqlConsoleOpen) {
     return (
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => ui.setSqlConsoleOpen(true)}
         className="fixed bottom-4 right-4 z-50 shadow-lg"
         size="sm"
       >
@@ -106,28 +107,32 @@ export const SqlConsole = observer(function SqlConsole() {
             UI
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => ui.setSqlConsoleOpen(false)}
+        >
           <ChevronsDown className="size-4" />
         </Button>
       </div>
 
       <div className="flex flex-wrap gap-1 border-b border-[--color-border] px-3 py-2">
-        {SAMPLES.map((s) => (
+        {SAMPLES.map((sample) => (
           <button
-            key={s.label}
+            key={sample.label}
             type="button"
-            onClick={() => setSql(s.sql)}
+            onClick={() => (s.sql = sample.sql)}
             className="rounded border border-[--color-border] bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            {s.label}
+            {sample.label}
           </button>
         ))}
       </div>
 
       <textarea
         ref={textareaRef}
-        value={sql}
-        onChange={(e) => setSql(e.target.value)}
+        value={s.sql}
+        onChange={(e) => (s.sql = e.target.value)}
         onKeyDown={onKeyDown}
         spellCheck={false}
         className="h-40 resize-none bg-muted/20 p-3 font-mono text-[12px] leading-relaxed outline-none"
@@ -144,20 +149,24 @@ export const SqlConsole = observer(function SqlConsole() {
           </kbd>{" "}
           to run
         </div>
-        <Button size="sm" onClick={() => void run()} disabled={busy}>
+        <Button size="sm" onClick={() => void run()} disabled={s.busy}>
           <Play className="size-3.5" />
-          {busy ? "Running…" : "Run"}
+          {s.busy ? "Running…" : "Run"}
         </Button>
       </div>
 
       <div className="min-h-20 overflow-auto border-t border-[--color-border]">
-        <ResultView result={result} />
+        <ResultView result={s.result} />
       </div>
     </div>
   );
 });
 
-function ResultView({ result }: { result: SqlResult }): React.ReactElement {
+const ResultView = observer(function ResultView({
+  result,
+}: {
+  result: SqlResult;
+}) {
   if (result.kind === "idle") {
     return (
       <div className="px-3 py-4 text-xs text-muted-foreground">
@@ -232,7 +241,7 @@ function ResultView({ result }: { result: SqlResult }): React.ReactElement {
       </table>
     </div>
   );
-}
+});
 
 function formatCell(v: unknown): string {
   if (v === null) return "null";

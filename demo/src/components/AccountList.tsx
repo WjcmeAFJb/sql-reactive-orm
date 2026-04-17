@@ -5,14 +5,9 @@ import { Card } from "@/components/ui/card";
 import { AccountCard } from "./AccountCard";
 import { Account } from "@/db/entities";
 import { useOrm } from "@/db/orm-context";
+import { ui } from "@/ui/ui-state";
 
-export const AccountList = observer(function AccountList({
-  onEdit,
-  onAdd,
-}: {
-  onEdit: (a: Account) => void;
-  onAdd: () => void;
-}) {
+export const AccountList = observer(function AccountList() {
   const orm = useOrm();
   const accounts = use(
     orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
@@ -20,14 +15,14 @@ export const AccountList = observer(function AccountList({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {accounts.map((a) => (
-        <AccountCard key={a.id} account={a} onEdit={() => onEdit(a)} />
+        <AccountCard key={a.id} account={a} />
       ))}
       <Card
         role="button"
         tabIndex={0}
-        onClick={onAdd}
+        onClick={() => ui.openNewAccount()}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onAdd();
+          if (e.key === "Enter" || e.key === " ") ui.openNewAccount();
         }}
         className="flex cursor-pointer items-center justify-center border-dashed p-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
       >

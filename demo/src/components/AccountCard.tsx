@@ -5,18 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn, formatMoney } from "@/lib/utils";
 import { Account } from "@/db/entities";
+import { ui } from "@/ui/ui-state";
 
-/**
- * An account card. Balance = initialBalance + Σ transactions.amount.
- * Every read here goes through an ORM getter — the card re-renders
- * whenever any of those observables move.
- */
 export const AccountCard = observer(function AccountCard({
   account,
-  onEdit,
 }: {
   account: Account;
-  onEdit: () => void;
 }) {
   const name = use(account.name);
   const color = use(account.color);
@@ -51,7 +45,7 @@ export const AccountCard = observer(function AccountCard({
       <Button
         variant="ghost"
         size="icon"
-        onClick={onEdit}
+        onClick={() => ui.openEditAccount(account)}
         aria-label={`Edit ${name}`}
         className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
       >

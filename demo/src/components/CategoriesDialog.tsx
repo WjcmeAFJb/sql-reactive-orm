@@ -1,5 +1,5 @@
-import { observer } from "mobx-react-lite";
-import { use, useState, type FormEvent } from "react";
+import { observer, useLocalObservable } from "mobx-react-lite";
+import { use, type FormEvent } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,9 @@ const COLORS = [
 export const CategoriesDialog = observer(function CategoriesDialog() {
   const orm = useOrm();
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const s = useLocalObservable(() => ({
+    editingId: null as number | null,
+  }));
 
   return (
     <div className="space-y-4">
@@ -42,17 +44,17 @@ export const CategoriesDialog = observer(function CategoriesDialog() {
         </div>
         <div className="max-h-[360px] overflow-y-auto -mx-6 px-6">
           {categories.map((c) =>
-            editingId === c.id ? (
+            s.editingId === c.id ? (
               <EditCategoryRow
                 key={c.id}
                 category={c}
-                onDone={() => setEditingId(null)}
+                onDone={() => (s.editingId = null)}
               />
             ) : (
               <CategoryRow
                 key={c.id}
                 category={c}
-                onEdit={() => setEditingId(c.id)}
+                onEdit={() => (s.editingId = c.id)}
                 onDelete={() => void deleteCategory(orm, c)}
               />
             ),
@@ -119,29 +121,36 @@ const EditCategoryRow = observer(function EditCategoryRow({
   onDone: () => void;
 }) {
   const orm = useOrm();
-  const [name, setName] = useState(use(category.name) as string);
-  const [color, setColor] = useState(use(category.color) as string);
-  const [kind, setKind] = useState<"income" | "expense">(
-    use(category.kind) as "income" | "expense",
-  );
+  const s = useLocalObservable(() => ({
+    name: use(category.name) as string,
+    color: use(category.color) as string,
+    kind: use(category.kind) as "income" | "expense",
+  }));
 
   async function save(e: FormEvent): Promise<void> {
     e.preventDefault();
-    if (!name.trim()) return;
-    await orm.update(category, { name: name.trim(), color, kind });
+    if (!s.name.trim()) return;
+    await orm.update(category, {
+      name: s.name.trim(),
+      color: s.color,
+      kind: s.kind,
+    });
     onDone();
   }
 
   return (
     <form onSubmit={save} className="flex items-center gap-2 py-1.5">
-      <ColorDot value={color} onChange={setColor} />
+      <ColorDot value={s.color} onChange={(c) => (s.color = c)} />
       <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        value={s.name}
+        onChange={(e) => (s.name = e.target.value)}
         className="h-8 flex-1"
         autoFocus
       />
-      <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+      <Select
+        value={s.kind}
+        onValueChange={(v) => (s.kind = v as typeof s.kind)}
+      >
         <SelectTrigger className="h-8 w-28">
           <SelectValue />
         </SelectTrigger>
@@ -162,16 +171,22 @@ const EditCategoryRow = observer(function EditCategoryRow({
 
 const NewCategoryRow = observer(function NewCategoryRow() {
   const orm = useOrm();
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(COLORS[0]!);
-  const [kind, setKind] = useState<"income" | "expense">("expense");
+  const s = useLocalObservable(() => ({
+    name: "",
+    color: COLORS[0]!,
+    kind: "expense" as "income" | "expense",
+  }));
 
   async function save(e: FormEvent): Promise<void> {
     e.preventDefault();
-    const trimmed = name.trim();
+    const trimmed = s.name.trim();
     if (!trimmed) return;
-    await orm.insert(Category, { name: trimmed, color, kind });
-    setName("");
+    await orm.insert(Category, {
+      name: trimmed,
+      color: s.color,
+      kind: s.kind,
+    });
+    s.name = "";
   }
 
   return (
@@ -179,14 +194,17 @@ const NewCategoryRow = observer(function NewCategoryRow() {
       onSubmit={save}
       className="flex items-center gap-2 rounded-md border border-dashed p-2"
     >
-      <ColorDot value={color} onChange={setColor} />
+      <ColorDot value={s.color} onChange={(c) => (s.color = c)} />
       <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        value={s.name}
+        onChange={(e) => (s.name = e.target.value)}
         placeholder="New category name"
         className="h-8 flex-1"
       />
-      <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+      <Select
+        value={s.kind}
+        onValueChange={(v) => (s.kind = v as typeof s.kind)}
+      >
         <SelectTrigger className="h-8 w-28">
           <SelectValue />
         </SelectTrigger>
@@ -195,34 +213,34 @@ const NewCategoryRow = observer(function NewCategoryRow() {
           <SelectItem value="income">Income</SelectItem>
         </SelectContent>
       </Select>
-      <Button type="submit" size="icon" disabled={!name.trim()}>
+      <Button type="submit" size="icon" disabled={!s.name.trim()}>
         <Plus className="size-4" />
       </Button>
     </form>
   );
 });
 
-function ColorDot({
+const ColorDot = observer(function ColorDot({
   value,
   onChange,
 }: {
   value: string;
   onChange: (v: string) => void;
-}): React.ReactElement {
-  const [open, setOpen] = useState(false);
+}) {
+  const s = useLocalObservable(() => ({ open: false }));
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((x) => !x)}
+        onClick={() => (s.open = !s.open)}
         className={cn(
           "size-6 rounded-full border border-[--color-border]",
-          open && "ring-2 ring-[--color-ring] ring-offset-1",
+          s.open && "ring-2 ring-[--color-ring] ring-offset-1",
         )}
         style={{ backgroundColor: value }}
         aria-label="Pick color"
       />
-      {open && (
+      {s.open && (
         <div className="absolute left-0 top-7 z-10 flex gap-1 rounded-md border bg-popover p-1 shadow-md">
           {COLORS.map((c) => (
             <button
@@ -230,7 +248,7 @@ function ColorDot({
               key={c}
               onClick={() => {
                 onChange(c);
-                setOpen(false);
+                s.open = false;
               }}
               className={cn(
                 "size-5 rounded-full",
@@ -243,4 +261,4 @@ function ColorDot({
       )}
     </div>
   );
-}
+});
