@@ -32,10 +32,10 @@ export abstract class Entity {
   readonly id: unknown;
 
   /** observable.ref — null until the row is loaded. */
-  protected _row: Record<string, unknown> | null = null;
+  _row: Record<string, unknown> | null = null;
 
   /** observable.shallow map — set on eager load / resolution. */
-  protected _relations: Map<string, Promise<unknown>> = new Map();
+  _relations: Map<string, Promise<unknown>> = new Map();
 
   // --- non-observable de-dup caches ---
   private _rowLoad: Promise<Record<string, unknown>> | null = null;

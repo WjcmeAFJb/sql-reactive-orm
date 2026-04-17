@@ -1,5 +1,5 @@
 import { Entity, installAccessors } from "./entity.js";
-import { Query, type QueryOptions } from "./query.js";
+import { Query, eagerLoad, type QueryOptions } from "./query.js";
 import type { Driver } from "./driver.js";
 import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
@@ -40,6 +40,7 @@ export class Orm {
   private readonly _entities = new Map<string, EntityClass<Entity>>();
   private readonly _identity = new Map<string, Map<unknown, Entity>>();
   private readonly _subscribers = new Map<string, Set<() => void>>();
+  private readonly _pendingRefreshes = new Set<Promise<unknown>>();
 
   constructor(driver: Driver) {
     this.rawDriver = driver;
@@ -90,6 +91,19 @@ export class Orm {
     return this._identity.get(cls.schema.name)?.get(id) as T | undefined;
   }
 
+  /**
+   * Drop cached row data + relation results from every identity-mapped
+   * entity. Object identity is preserved (a component holding an
+   * entity will keep seeing the same instance), but the next field /
+   * relation access goes back to the driver. Handy for "reload from
+   * disk" buttons and for the demo's loading-strategy toggle.
+   */
+  clearCaches(): void {
+    for (const map of this._identity.values()) {
+      for (const inst of map.values()) inst._invalidate();
+    }
+  }
+
   // ---- subscription bus ----
 
   _subscribe(
@@ -119,37 +133,71 @@ export class Orm {
   }
 
   /**
-   * Signal that `table` changed. Kicks three things in order:
-   *   1. A batched row-refresh for every cached entity instance in
-   *      `table`. This is what makes direct-entity observers (not going
-   *      through a Query) reactive to raw SQL — `entity._row` is an
-   *      observable ref, so `_applyRow` on the latest DB state triggers
-   *      any `observer`-wrapped component reading a field on it. Fires
-   *      a single `SELECT … WHERE id IN (...)` regardless of cache size.
-   *   2. The Query subscription bus: any findAll / findFirst watching
+   * Signal that `table` changed. Schedules three things:
+   *
+   *   1. A batched row refresh for every cached entity instance in
+   *      `table` — one `SELECT … WHERE id IN (...)` regardless of cache
+   *      size. Entity rows are observable refs, so `_applyRow` on the
+   *      latest DB state propagates to every `observer` reading a field.
+   *
+   *   2. A batched relation refresh for every cached relation whose
+   *      target is `table`. We re-run the relation's IN-clause SELECT
+   *      through `eagerLoad`, which calls `_applyRelation` with the new
+   *      list. Crucially we do **not** clear the cached relation
+   *      promise first — observers keep rendering the previous list
+   *      until the fresh one arrives, so the UI never suspends into a
+   *      fallback on mutation (stale-while-revalidate).
+   *
+   *   3. The Query subscription bus: any findAll / findFirst watching
    *      this table re-executes.
-   *   3. Relation invalidation: drop cached relation promises on
-   *      entities whose schema has a relation targeting `table`, so the
-   *      next relation read re-queries.
+   *
+   * Steps 1 and 2 are async. Callers that need to observe the post-
+   * mutation state synchronously (tests, any write-then-immediately-
+   * read sequence) can `await orm.settle()` to wait for the refreshes
+   * currently in flight.
    */
   _notifyTable(table: string): void {
-    void this._refreshCachedRowsFor(table);
+    this._trackRefresh(this._refreshCachedRowsFor(table));
+    this._trackRefresh(this._refreshCachedRelationsFor(table));
 
     const subs = this._subscribers.get(table);
     if (subs) for (const cb of [...subs]) cb();
+  }
 
+  private _trackRefresh(p: Promise<unknown>): void {
+    this._pendingRefreshes.add(p);
+    p.finally(() => this._pendingRefreshes.delete(p));
+  }
+
+  /**
+   * Wait for every in-flight background refresh (row + relation) to
+   * land. Handy in tests after a mutation, before asserting on a
+   * relation that the ORM is about to re-populate.
+   */
+  async settle(): Promise<void> {
+    while (this._pendingRefreshes.size > 0) {
+      await Promise.all([...this._pendingRefreshes]);
+    }
+  }
+
+  private async _refreshCachedRelationsFor(table: string): Promise<void> {
     for (const [entityName, cls] of this._entities) {
-      let targets = false;
-      for (const rel of Object.values(cls.schema.relations)) {
-        if (rel.target().schema.table === table) {
-          targets = true;
-          break;
+      const map = this._identity.get(entityName);
+      if (!map || map.size === 0) continue;
+      for (const [relName, rel] of Object.entries(cls.schema.relations)) {
+        if (rel.target().schema.table !== table) continue;
+        const parents: Entity[] = [];
+        for (const inst of map.values()) {
+          if (inst._relations.has(relName)) parents.push(inst);
+        }
+        if (parents.length === 0) continue;
+        try {
+          await eagerLoad(this, cls, parents, { [relName]: true });
+        } catch {
+          // Swallow background-refresh failures — the cached (stale)
+          // promise stays in place, which is better than crashing.
         }
       }
-      if (!targets) continue;
-      const map = this._identity.get(entityName);
-      if (!map) continue;
-      for (const inst of map.values()) inst._invalidateRelations(table);
     }
   }
 

@@ -362,6 +362,42 @@ describe("where: null", () => {
   });
 });
 
+describe("orm.clearCaches()", () => {
+  it("drops cached row + relation data, preserves entity identity", async () => {
+    const u = await orm.insert(User, { name: "Alice", email: "a@x" });
+    await orm.insert(Post, { title: "P1", authorId: u.id });
+    await u.posts; // materialise the relation cache
+    expect(u._row).not.toBeNull();
+    expect(u._relations.has("posts")).toBe(true);
+
+    orm.clearCaches();
+
+    expect(u._row).toBeNull();
+    expect(u._relations.has("posts")).toBe(false);
+    // Same instance survives — next access refetches from the driver.
+    expect(orm.peek(User, u.id)).toBe(u);
+    expect(await u.name).toBe("Alice");
+    expect(await u.posts).toHaveLength(1);
+  });
+});
+
+describe("orm.settle()", () => {
+  it("waits for post-mutation row + relation refreshes to land", async () => {
+    const u = await orm.insert(User, { name: "A", email: "a@x" });
+    await orm.insert(Post, { title: "P1", authorId: u.id });
+    await u.posts;
+
+    await orm.insert(Post, { title: "P2", authorId: u.id });
+    // Without waiting, the cached relation promise is still the stale
+    // [P1] one — stale-while-revalidate keeps the old data up until the
+    // refresh completes. `settle()` bridges the gap for code that needs
+    // to observe the fresh state synchronously.
+    await orm.settle();
+    const posts = await u.posts;
+    expect(posts).toHaveLength(2);
+  });
+});
+
 describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () => {
   it("raw UPDATE through orm.driver refreshes an open query", async () => {
     const u = await orm.insert(User, { name: "Alice", email: "a@x" });
