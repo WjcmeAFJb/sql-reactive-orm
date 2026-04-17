@@ -401,7 +401,7 @@ describe("orm.transaction()", () => {
     });
     await new Promise((r) => setTimeout(r, 0));
     expect(runs).toBe(1);
-    await q.promise;
+    await q;
     expect(q.value).toHaveLength(3);
     q.dispose();
   });

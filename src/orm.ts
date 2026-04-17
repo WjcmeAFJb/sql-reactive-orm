@@ -10,6 +10,17 @@ import type { Driver } from "./driver.js";
 import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
 import type { EntityClass, FieldDef, RelationDef } from "./schema.js";
+import { SqlQuery, type SqlQueryOptions } from "./sql-query.js";
+
+function sqlKey(
+  sql: string,
+  params: readonly unknown[],
+  options: SqlQueryOptions<never>,
+): string {
+  const keyBy = options.keyBy ? options.keyBy.toString() : "";
+  const watch = options.watch ? [...options.watch].sort().join(",") : "";
+  return `sql:${sql}:${JSON.stringify(params)}:${watch}:${keyBy}`;
+}
 
 function encode(def: FieldDef, value: unknown): unknown {
   if (value == null) return null;
@@ -62,6 +73,7 @@ export class Orm {
    * component's re-renders don't re-issue the SELECT.
    */
   private readonly _queryCache = new Map<string, Query<unknown>>();
+  private readonly _sqlCache = new Map<string, SqlQuery<Record<string, unknown>>>();
 
   constructor(driver: Driver) {
     this.rawDriver = driver;
@@ -403,6 +415,44 @@ export class Orm {
   clearQueryCache(): void {
     for (const q of this._queryCache.values()) q.dispose();
     this._queryCache.clear();
+    for (const q of this._sqlCache.values()) q.dispose();
+    this._sqlCache.clear();
+  }
+
+  /**
+   * Run an arbitrary SELECT and get back a reactive, self-refetching
+   * array of row objects. Designed for aggregate / join queries the
+   * entity-level `findAll` can't express. Consumes like any other
+   * reactive query:
+   *
+   *   const rows = use(orm.sqlQuery<{ name: string; total: number }>(
+   *     `SELECT c.name, SUM(t.amount) AS total
+   *        FROM transactions t JOIN categories c ON c.id = t.categoryId
+   *       WHERE t.amount < 0
+   *       GROUP BY c.id`,
+   *   ));
+   *
+   * Every refetch triggered by a mutation to an involved table is
+   * diffed against the previous rows and patched in place — object
+   * identity is preserved per row, and only the leaf `.total`
+   * observers of rows whose totals actually moved fire. Components
+   * that read other columns stay still.
+   *
+   * By default the involved tables are inferred from `FROM` / `JOIN`.
+   * Pass `watch: [...]` to override, or `keyBy: (row) => row.id` to
+   * match rows across re-orderings.
+   */
+  sqlQuery<T extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    params: readonly unknown[] = [],
+    options: SqlQueryOptions<T> = {},
+  ): SqlQuery<T> {
+    const key = sqlKey(sql, params, options);
+    const cached = this._sqlCache.get(key);
+    if (cached) return cached as SqlQuery<T>;
+    const q = new SqlQuery<T>(this, sql, params, options);
+    this._sqlCache.set(key, q as unknown as SqlQuery<Record<string, unknown>>);
+    return q;
   }
 
   private _getOrCreateQuery<T>(

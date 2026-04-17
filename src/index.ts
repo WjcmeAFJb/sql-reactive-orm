@@ -39,3 +39,9 @@ export { resolved, rejected, track, isFulfilled } from "./promise-utils.js";
 export type { TrackedPromise } from "./promise-utils.js";
 export type { Driver, RunResult } from "./driver.js";
 export { wrapReactive, detectMutatedTables } from "./reactive-driver.js";
+export {
+  SqlQuery,
+  detectReadTables,
+  patchInto,
+} from "./sql-query.js";
+export type { SqlQueryOptions } from "./sql-query.js";
