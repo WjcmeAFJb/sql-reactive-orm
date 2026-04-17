@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+coverage/
+.vitest-cache/
+.vitest-attachments/
+# Auto-copied by vitest.config.ts for browser tests.
+public/sql-wasm.wasm
