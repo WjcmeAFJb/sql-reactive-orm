@@ -22,4 +22,8 @@ export default defineConfig({
     include: ["sql.js"],
     exclude: ["sql-reactive-orm"],
   },
+  server: {
+    host: '0.0.0.0',
+    allowedHosts: ['.code.internal.local']
+  }
 });

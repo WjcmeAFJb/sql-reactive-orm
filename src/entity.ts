@@ -1,5 +1,5 @@
 import { makeObservable, observable, runInAction } from "mobx";
-import { resolved } from "./promise-utils.js";
+import { isFulfilled, resolved } from "./promise-utils.js";
 import type { EntityClass, EntitySchema, FieldDef } from "./schema.js";
 import type { Orm } from "./orm.js";
 
@@ -135,10 +135,10 @@ export abstract class Entity {
         `No relation "${name}" on entity "${this._schema().name}"`,
       );
     return this._orm._loadRelation(this, rel).then((value) => {
-      runInAction(() => {
-        this._relations.set(name, resolved(value));
-        this._pendingRelations.delete(name);
-      });
+      // Route through `_applyRelation` so the shallow-compare fast-path
+      // kicks in here too (relevant for lazy relation reads that race
+      // with an eager refresh of the same relation).
+      this._applyRelation(name, value);
       return value;
     });
   }
@@ -185,7 +185,22 @@ export abstract class Entity {
     });
   }
 
+  /**
+   * Store or replace a relation's resolved value. Shallow-compares
+   * against the currently-cached value first: for belongsTo that's a
+   * single entity reference, for hasMany a sequence. Because the
+   * identity map hands back the same JS object for a given (table, id),
+   * the common case of "refetched, same shape" never triggers a MobX
+   * write, and therefore never re-renders the observers that read the
+   * relation. Skipping those no-op writes is what makes queries with a
+   * `with` clause not thrash the UI after every mutation.
+   */
   _applyRelation(name: string, value: unknown): void {
+    const existing = this._relations.get(name);
+    if (existing && relationValuesEqual(existing, value)) {
+      this._pendingRelations.delete(name);
+      return;
+    }
     runInAction(() => {
       this._relations.set(name, resolved(value));
       this._pendingRelations.delete(name);
@@ -244,6 +259,23 @@ function rowsShallowEqual(
     if (a[k] !== b[k]) return false;
   }
   return true;
+}
+
+function relationValuesEqual(
+  cached: Promise<unknown>,
+  next: unknown,
+): boolean {
+  if (!isFulfilled(cached)) return false;
+  const prev = cached.value;
+  if (prev === next) return true;
+  if (Array.isArray(prev) && Array.isArray(next)) {
+    if (prev.length !== next.length) return false;
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] !== next[i]) return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 /**
