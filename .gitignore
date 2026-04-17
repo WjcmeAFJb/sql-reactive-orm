@@ -5,5 +5,6 @@ dist/
 coverage/
 .vitest-cache/
 .vitest-attachments/
+test/__screenshots__/
 # Auto-copied by vitest.config.ts for browser tests.
 public/sql-wasm.wasm
