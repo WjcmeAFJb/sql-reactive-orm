@@ -1,19 +1,38 @@
 import { observer } from "mobx-react-lite";
 import { use } from "react";
+import { Plus } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { AccountCard } from "./AccountCard";
-import type { AppState } from "@/db/state";
+import { Account } from "@/db/entities";
+import { useOrm } from "@/db/orm-context";
 
 export const AccountList = observer(function AccountList({
-  state,
+  onEdit,
+  onAdd,
 }: {
-  state: AppState;
+  onEdit: (a: Account) => void;
+  onAdd: () => void;
 }) {
-  const accounts = state.accounts.result ?? use(state.accounts.promise);
+  const orm = useOrm();
+  const accounts = use(
+    orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
+  );
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {accounts.map((a) => (
-        <AccountCard key={a.id} account={a} />
+        <AccountCard key={a.id} account={a} onEdit={() => onEdit(a)} />
       ))}
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={onAdd}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") onAdd();
+        }}
+        className="flex cursor-pointer items-center justify-center border-dashed p-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+      >
+        <Plus className="mr-1 size-4" /> Add account
+      </Card>
     </div>
   );
 });

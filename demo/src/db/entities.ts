@@ -72,6 +72,9 @@ export class Transaction extends Entity {
       amount: real(),
       note: text({ nullable: true }),
       date: text(),
+      // When non-null, this row is one leg of a two-row transfer between
+      // accounts. Both legs share the same `transferId`.
+      transferId: text({ nullable: true }),
     },
     relations: {
       account: belongsTo(() => Account, "accountId"),
@@ -84,6 +87,7 @@ export class Transaction extends Entity {
   declare amount: Promise<number>;
   declare note: Promise<string | null>;
   declare date: Promise<string>;
+  declare transferId: Promise<string | null>;
   declare account: Promise<Account>;
   declare category: Promise<Category | null>;
 }

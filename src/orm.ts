@@ -1,5 +1,11 @@
 import { Entity, installAccessors } from "./entity.js";
-import { Query, eagerLoad, type QueryOptions } from "./query.js";
+import {
+  Query,
+  eagerLoad,
+  queryKey,
+  type QueryKind,
+  type QueryOptions,
+} from "./query.js";
 import type { Driver } from "./driver.js";
 import { wrapReactive } from "./reactive-driver.js";
 import { generateDDL } from "./schema.js";
@@ -41,6 +47,14 @@ export class Orm {
   private readonly _identity = new Map<string, Map<unknown, Entity>>();
   private readonly _subscribers = new Map<string, Set<() => void>>();
   private readonly _pendingRefreshes = new Set<Promise<unknown>>();
+  /**
+   * Cache of live `Query` objects keyed by (kind, entity, stable-opts).
+   * The point is that `orm.findAll(Transaction, { … })` typed inline
+   * inside a component's render returns the *same* Query object every
+   * time — so React 19's `use(query)` sees a stable thenable, and the
+   * component's re-renders don't re-issue the SELECT.
+   */
+  private readonly _queryCache = new Map<string, Query<unknown>>();
 
   constructor(driver: Driver) {
     this.rawDriver = driver;
@@ -357,24 +371,14 @@ export class Orm {
     cls: EntityClass<T>,
     opts: QueryOptions = {},
   ): Query<T[]> {
-    return new Query<T[]>(
-      this,
-      cls as unknown as EntityClass<Entity>,
-      opts,
-      "findAll",
-    );
+    return this._getOrCreateQuery<T[]>(cls, opts, "findAll");
   }
 
   findFirst<T extends Entity>(
     cls: EntityClass<T>,
     opts: QueryOptions = {},
   ): Query<T | null> {
-    return new Query<T | null>(
-      this,
-      cls as unknown as EntityClass<Entity>,
-      opts,
-      "findFirst",
-    );
+    return this._getOrCreateQuery<T | null>(cls, opts, "findFirst");
   }
 
   find<T extends Entity>(
@@ -386,6 +390,25 @@ export class Orm {
       ...opts,
       where: { [cls.schema.primaryKey]: id as never },
     });
+  }
+
+  /** Drop every cached Query. Any held-onto handles will keep working. */
+  clearQueryCache(): void {
+    for (const q of this._queryCache.values()) q.dispose();
+    this._queryCache.clear();
+  }
+
+  private _getOrCreateQuery<T>(
+    cls: EntityClass<Entity>,
+    opts: QueryOptions,
+    kind: QueryKind,
+  ): Query<T> {
+    const key = queryKey(kind, cls.schema.name, opts);
+    const cached = this._queryCache.get(key);
+    if (cached) return cached as Query<T>;
+    const q = new Query<T>(this, cls, opts, kind);
+    this._queryCache.set(key, q as unknown as Query<unknown>);
+    return q;
   }
 
   async close(): Promise<void> {

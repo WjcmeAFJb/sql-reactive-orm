@@ -1,20 +1,22 @@
 import { observer } from "mobx-react-lite";
 import { use } from "react";
+import { Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn, formatMoney } from "@/lib/utils";
 import { Account } from "@/db/entities";
 
 /**
- * An account card. Balance = initialBalance + Σ amounts. Because the
- * component is wrapped in `observer` and reads observable fields off the
- * ORM entities, the balance *literally* recomputes when any related
- * transaction is added, updated, or deleted — from anywhere in the app.
- * No subscription plumbing, no selectors, no memoization.
+ * An account card. Balance = initialBalance + Σ transactions.amount.
+ * Every read here goes through an ORM getter — the card re-renders
+ * whenever any of those observables move.
  */
 export const AccountCard = observer(function AccountCard({
   account,
+  onEdit,
 }: {
   account: Account;
+  onEdit: () => void;
 }) {
   const name = use(account.name);
   const color = use(account.color);
@@ -26,7 +28,7 @@ export const AccountCard = observer(function AccountCard({
   );
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="group relative overflow-hidden">
       <div className="h-1" style={{ backgroundColor: color }} />
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
@@ -43,11 +45,18 @@ export const AccountCard = observer(function AccountCard({
               {formatMoney(balance)}
             </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {txs.length} tx
-          </div>
+          <div className="text-xs text-muted-foreground">{txs.length} tx</div>
         </div>
       </CardContent>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onEdit}
+        aria-label={`Edit ${name}`}
+        className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100"
+      >
+        <Pencil className="size-4" />
+      </Button>
     </Card>
   );
 });

@@ -1,6 +1,5 @@
 import { makeObservable, observable, runInAction } from "mobx";
 import { Entity } from "./entity.js";
-import { resolved, type TrackedPromise } from "./promise-utils.js";
 import type { EntityClass, RelationDef } from "./schema.js";
 import type { Orm } from "./orm.js";
 
@@ -43,7 +42,7 @@ export interface QueryOptions {
   offset?: number;
 }
 
-type QueryKind = "findAll" | "findFirst";
+export type QueryKind = "findAll" | "findFirst";
 
 // ---- sql builders ----
 
@@ -143,32 +142,77 @@ export function expandWith(w: WithClause | undefined): WithSpec {
   return out;
 }
 
+/** Normalised JSON-ish serialisation for stable query-cache keys. */
+export function queryKey(
+  kind: QueryKind,
+  entityName: string,
+  opts: QueryOptions,
+): string {
+  return `${kind}:${entityName}:${stableStringify(opts)}`;
+}
+
+function stableStringify(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  const obj = v as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return (
+    "{" +
+    keys
+      .map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+      .join(",") +
+    "}"
+  );
+}
+
 // ---- Query ----
 
 /**
- * A reactive query handle. Fields (`promise`, `result`, `loading`, `error`)
- * are MobX observables — read them inside an `observer` component and the
- * component re-renders automatically.
+ * A reactive, cache-then-revalidate handle for a findAll / findFirst.
  *
- * The query subscribes to mutations on the involved tables (the target
- * table plus any tables named in `with`) and refetches on change. Pass
- * `query.promise` to React's `use` to get Suspense-compatible access, or
- * `await query` directly for imperative flows — the instance is itself a
- * thenable.
+ * Implements Thenable (React 19's `use(query)` reads `.status` + `.value`
+ * off it), so the first render suspends on the initial fetch. Once the
+ * initial fetch completes, `.status` flips to `"fulfilled"` and stays
+ * there — re-renders return the cached value synchronously.
  *
- * Call `dispose()` when the query is no longer needed to drop the
- * subscription; in React this is typically done in a `useEffect` cleanup.
+ * When a subscribed table mutates, the query refetches in the
+ * background. During that window the previous value is still returned
+ * (no Suspense fallback flash). When the new value lands, `.value`
+ * changes → MobX fires → every `observer` reading the query re-renders
+ * with the fresh data. If the fetch errors, `.status` becomes
+ * `"rejected"` and `use` throws.
+ *
+ * `.then` is provided so `await query` still works, and so React's
+ * internal Suspense ping mechanism can wait on the first load.
  */
-export class Query<T> implements PromiseLike<T> {
-  promise: TrackedPromise<T>;
-  result: T | undefined = undefined;
-  loading = true;
-  error: unknown = null;
+// Module augmentation so React 19's `use(query)` type-checks directly.
+// At runtime Query is already a valid thenable with the `.status` /
+// `.value` / `.reason` discriminants React's internals read — this just
+// tells TypeScript about it. Consumers get the overload automatically
+// as soon as they import anything from the package.
+declare module "react" {
+  function use<T>(query: Query<T>): T;
+}
+
+export class Query<T> implements Promise<T> {
+  // `Promise<T>` brand so React 19's `use(query)` typechecks directly —
+  // at runtime the object is a thenable with `.then` + the `.status` /
+  // `.value` / `.reason` discriminants React's internals read.
+  readonly [Symbol.toStringTag] = "Query";
+
+  /** Read by React 19's `use()` to decide sync / suspend / throw. */
+  status: "pending" | "fulfilled" | "rejected" = "pending";
+  /** Latest resolved value — observable so `observer`s re-render on update. */
+  value: T | undefined = undefined;
+  /** Latest rejection reason. */
+  reason: unknown = undefined;
 
   private readonly _involved: Set<string>;
   private _unsubscribe: (() => void) | null = null;
   private _disposed = false;
   private _runId = 0;
+  /** Promise of the current (latest) run, for `.then` delegation. */
+  private _currentPromise: Promise<T>;
 
   constructor(
     private readonly _orm: Orm,
@@ -176,30 +220,38 @@ export class Query<T> implements PromiseLike<T> {
     private readonly _opts: QueryOptions,
     private readonly _kind: QueryKind,
   ) {
-    this.promise = resolved(undefined as unknown as T);
     makeObservable(this, {
-      promise: observable.ref,
-      result: observable.ref,
-      loading: observable,
-      error: observable.ref,
+      status: observable,
+      value: observable.ref,
+      reason: observable.ref,
     });
     this._involved = this._computeInvolvedTables();
     this._unsubscribe = this._orm._subscribe(this._involved, () => {
       if (!this._disposed) this._execute();
     });
-    this._execute();
+    this._currentPromise = this._execute();
   }
 
   then<U = T, V = never>(
     onFulfilled?: ((value: T) => U | PromiseLike<U>) | null,
     onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null,
   ): Promise<U | V> {
-    return this.promise.then(onFulfilled, onRejected);
+    return this._currentPromise.then(onFulfilled, onRejected);
+  }
+
+  catch<V = never>(
+    onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null,
+  ): Promise<T | V> {
+    return this._currentPromise.catch(onRejected);
+  }
+
+  finally(onFinally?: (() => void) | null): Promise<T> {
+    return this._currentPromise.finally(onFinally);
   }
 
   refetch(): Promise<T> {
-    this._execute();
-    return this.promise;
+    this._currentPromise = this._execute();
+    return this._currentPromise;
   }
 
   dispose(): void {
@@ -210,34 +262,30 @@ export class Query<T> implements PromiseLike<T> {
 
   // ---- internal ----
 
-  private _execute(): void {
+  private _execute(): Promise<T> {
     const id = ++this._runId;
     const p = this._run(id);
-    // Don't pre-stamp pending status — React's `use` owns that transition.
-    // On resolution we swap in a pre-stamped fulfilled promise so subsequent
-    // observer reads don't re-suspend.
-    runInAction(() => {
-      this.promise = p as TrackedPromise<T>;
-      this.loading = true;
-      this.error = null;
-    });
     p.then(
       (value) => {
         if (id !== this._runId) return;
         runInAction(() => {
-          this.promise = resolved(value);
-          this.result = value;
-          this.loading = false;
+          // Keep status at "fulfilled" forever once it's been set — on
+          // subsequent refetches we just swap `.value`. That's what
+          // makes re-renders during a revalidation return cached data.
+          if (this.status !== "fulfilled") this.status = "fulfilled";
+          this.value = value;
+          this.reason = undefined;
         });
       },
       (err) => {
         if (id !== this._runId) return;
         runInAction(() => {
-          this.error = err;
-          this.loading = false;
+          this.status = "rejected";
+          this.reason = err;
         });
       },
     );
+    return p;
   }
 
   private async _run(_id: number): Promise<T> {
@@ -250,7 +298,8 @@ export class Query<T> implements PromiseLike<T> {
     const { sql: whereSql, params } = buildWhere(this._opts.where);
     let sql = `SELECT ${selectCols} FROM "${schema.table}"`;
     if (whereSql) sql += ` ${whereSql}`;
-    if (this._opts.orderBy) sql += ` ORDER BY ${buildOrderBy(this._opts.orderBy)}`;
+    if (this._opts.orderBy)
+      sql += ` ORDER BY ${buildOrderBy(this._opts.orderBy)}`;
     const effectiveLimit =
       this._kind === "findFirst"
         ? 1
@@ -270,7 +319,12 @@ export class Query<T> implements PromiseLike<T> {
     });
 
     if (this._opts.with) {
-      await eagerLoad(this._orm, this._cls, instances, expandWith(this._opts.with));
+      await eagerLoad(
+        this._orm,
+        this._cls,
+        instances,
+        expandWith(this._opts.with),
+      );
     }
 
     if (this._kind === "findAll") return instances as unknown as T;
@@ -313,7 +367,13 @@ export async function eagerLoad(
       throw new Error(
         `Unknown relation "${relName}" on ${parentCls.schema.name}`,
       );
-    const children = await loadRelationBatch(orm, parentCls, parents, relName, rel);
+    const children = await loadRelationBatch(
+      orm,
+      parentCls,
+      parents,
+      relName,
+      rel,
+    );
     if (nested !== true && children.length > 0) {
       await eagerLoad(orm, rel.target(), children, nested);
     }
@@ -333,7 +393,6 @@ async function loadRelationBatch(
   const children: Entity[] = [];
 
   if (rel.kind === "belongsTo") {
-    // this.foreignKey → target.id
     const fkValues = new Set<unknown>();
     const parentFks = new Map<Entity, unknown>();
     for (const p of parents) {
@@ -364,7 +423,6 @@ async function loadRelationBatch(
     return children;
   }
 
-  // hasMany / hasOne — this.localKey appears as target.foreignKey
   const parentKeys = new Set<unknown>();
   const parentLocal = new Map<Entity, unknown>();
   for (const p of parents) {
@@ -401,7 +459,10 @@ async function loadRelationBatch(
   for (const p of parents) {
     const lv = parentLocal.get(p);
     const matches = lv != null ? byFk.get(lv) ?? [] : [];
-    p._applyRelation(relName, rel.kind === "hasOne" ? matches[0] ?? null : matches);
+    p._applyRelation(
+      relName,
+      rel.kind === "hasOne" ? matches[0] ?? null : matches,
+    );
   }
   return children;
 }

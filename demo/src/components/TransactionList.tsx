@@ -1,24 +1,30 @@
 import { observer } from "mobx-react-lite";
 import { use } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { TransactionRow } from "./TransactionRow";
-import type { AppState } from "@/db/state";
+import { Transaction } from "@/db/entities";
+import { useOrm } from "@/db/orm-context";
 
-/**
- * Reactive list: `state.transactions` is a Query; its `.result`
- * observable holds the last-resolved array. When a mutation fires a
- * refetch we *keep rendering the old array* until the new one arrives
- * — so the user never sees a blank suspense fallback on a subsequent
- * mutation.
- */
 export const TransactionList = observer(function TransactionList({
-  state,
+  onEdit,
 }: {
-  state: AppState;
+  onEdit: (tx: Transaction) => void;
 }) {
-  // `.result` stays populated through refetches; fall back to `use`
-  // (which suspends) only for the very first load.
-  const rows = state.transactions.result ?? use(state.transactions.promise);
+  const orm = useOrm();
+  const rows = use(
+    orm.findAll(Transaction, {
+      orderBy: [
+        ["date", "desc"],
+        ["id", "desc"],
+      ],
+      with: { account: true, category: true },
+    }),
+  );
 
   return (
     <Card>
@@ -38,7 +44,11 @@ export const TransactionList = observer(function TransactionList({
         ) : (
           <div className="divide-y divide-[--color-border]">
             {rows.map((tx) => (
-              <TransactionRow key={tx.id} tx={tx} state={state} />
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                onEdit={() => onEdit(tx)}
+              />
             ))}
           </div>
         )}

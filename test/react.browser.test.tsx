@@ -121,7 +121,7 @@ describe("react: reactive findAll + Suspense", () => {
   const UserList = observer(function UserList() {
     const query = useMemo(() => orm.findAll(User, { orderBy: "id" }), []);
     useEffect(() => () => query.dispose(), [query]);
-    const users = use(query.promise);
+    const users = use(query);
     return (
       <ul data-testid="list">
         {users.map((u) => (
@@ -145,7 +145,7 @@ describe("react: reactive findAll + Suspense", () => {
     await expect.element(screen.getByText("A")).toBeInTheDocument();
     await expect.element(screen.getByText("B")).toBeInTheDocument();
 
-    // Insert — auto-refetches the query; `use(query.promise)` re-suspends
+    // Insert — auto-refetches the query; `use(query)` re-suspends
     // briefly and then settles with the new list.
     await orm.insert(User, { name: "C", email: "c@x" });
     await expect.element(screen.getByText("C")).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("react: waterfall avoidance via `with`", () => {
     });
 
     const Runner = observer(function Runner() {
-      const loaded = use(q.promise);
+      const loaded = use(q);
       if (!loaded) return <span>none</span>;
       return <UserWithPosts user={loaded} />;
     });

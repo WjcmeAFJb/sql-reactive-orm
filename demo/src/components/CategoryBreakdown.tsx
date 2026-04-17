@@ -2,21 +2,21 @@ import { observer } from "mobx-react-lite";
 import { use } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatMoney } from "@/lib/utils";
-import type { AppState } from "@/db/state";
+import { Category, Transaction } from "@/db/entities";
+import { useOrm } from "@/db/orm-context";
 
-/**
- * A trailing 30-day spend breakdown per category. Every field access on
- * entities is synchronous in eager mode, so this component reads like
- * plain TypeScript that happens to be reactive.
- */
-export const CategoryBreakdown = observer(function CategoryBreakdown({
-  state,
-}: {
-  state: AppState;
-}) {
-  const categories =
-    state.categories.result ?? use(state.categories.promise);
-  const txs = state.transactions.result ?? use(state.transactions.promise);
+export const CategoryBreakdown = observer(function CategoryBreakdown() {
+  const orm = useOrm();
+  const categories = use(orm.findAll(Category, { orderBy: "id" }));
+  const txs = use(
+    orm.findAll(Transaction, {
+      orderBy: [
+        ["date", "desc"],
+        ["id", "desc"],
+      ],
+      with: { account: true, category: true },
+    }),
+  );
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 30);
@@ -50,9 +50,7 @@ export const CategoryBreakdown = observer(function CategoryBreakdown({
       </CardHeader>
       <CardContent className="space-y-2">
         {breakdown.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No expenses yet.
-          </div>
+          <div className="text-sm text-muted-foreground">No expenses yet.</div>
         ) : (
           breakdown.map((b) => {
             const pct = grandTotal > 0 ? (b.total / grandTotal) * 100 : 0;
@@ -73,10 +71,7 @@ export const CategoryBreakdown = observer(function CategoryBreakdown({
                 <div className="h-1.5 rounded bg-muted overflow-hidden">
                   <div
                     className={cn("h-full")}
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: b.color,
-                    }}
+                    style={{ width: `${pct}%`, backgroundColor: b.color }}
                   />
                 </div>
               </div>

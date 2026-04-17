@@ -194,15 +194,15 @@ describe("query reactivity", () => {
     const u1 = await orm.insert(User, { name: "A", email: "a@x" });
     const q = orm.findAll(User, { orderBy: "id" });
     await q;
-    expect(q.result).toHaveLength(1);
+    expect(q.value).toHaveLength(1);
 
     // Mutate and wait — the subscribed query should re-run
     const u2 = await orm.insert(User, { name: "B", email: "b@x" });
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
-    expect(q.result).toHaveLength(2);
-    expect(q.result![0]).toBe(u1);
-    expect(q.result![1]).toBe(u2);
+    await q;
+    expect(q.value).toHaveLength(2);
+    expect(q.value![0]).toBe(u1);
+    expect(q.value![1]).toBe(u2);
     q.dispose();
   });
 
@@ -212,12 +212,12 @@ describe("query reactivity", () => {
     await q;
     const sizes: number[] = [];
     const dispose = reaction(
-      () => q.result?.length ?? 0,
+      () => q.value?.length ?? 0,
       (n) => sizes.push(n),
     );
     await orm.insert(User, { name: "B", email: "b@x" });
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
+    await q;
     expect(sizes.at(-1)).toBe(2);
     dispose();
     q.dispose();
@@ -227,10 +227,10 @@ describe("query reactivity", () => {
     const q = orm.findAll(User);
     await q;
     q.dispose();
-    const before = q.promise;
+    const before = q;
     await orm.insert(User, { name: "X", email: "x@x" });
     await new Promise((r) => setTimeout(r, 0));
-    expect(q.promise).toBe(before);
+    expect(q).toBe(before);
   });
 });
 
@@ -403,7 +403,7 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     const u = await orm.insert(User, { name: "Alice", email: "a@x" });
     const q = orm.findAll(User, { orderBy: "id" });
     await q;
-    expect(await (q.result![0] as User).name).toBe("Alice");
+    expect(await (q.value![0] as User).name).toBe("Alice");
 
     // An "unrelated library" — represented here just by a hand-written
     // statement — mutates through the ORM's driver. No orm.update call.
@@ -412,24 +412,24 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
       u.id,
     ]);
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
-    expect(await (q.result![0] as User).name).toBe("Bob");
+    await q;
+    expect(await (q.value![0] as User).name).toBe("Bob");
     q.dispose();
   });
 
   it("raw INSERT through orm.driver surfaces the new row in a findAll query", async () => {
     const q = orm.findAll(User, { orderBy: "id" });
     await q;
-    expect(q.result).toEqual([]);
+    expect(q.value).toEqual([]);
 
     await orm.driver.run(
       'INSERT INTO "users" (name, email) VALUES (?, ?)',
       ["Carol", "c@x"],
     );
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
-    expect(q.result).toHaveLength(1);
-    expect(await q.result![0]!.name).toBe("Carol");
+    await q;
+    expect(q.value).toHaveLength(1);
+    expect(await q.value![0]!.name).toBe("Carol");
     q.dispose();
   });
 
@@ -438,12 +438,12 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     await orm.insert(User, { name: "B", email: "b@x" });
     const q = orm.findAll(User, { orderBy: "id" });
     await q;
-    expect(q.result).toHaveLength(2);
+    expect(q.value).toHaveLength(2);
 
     await orm.driver.run('DELETE FROM "users" WHERE id = ?', [u.id]);
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
-    expect(q.result).toHaveLength(1);
+    await q;
+    expect(q.value).toHaveLength(1);
     q.dispose();
   });
 
@@ -455,17 +455,17 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     const qp = orm.findAll(Post);
     await qu;
     await qp;
-    expect(qu.result).toHaveLength(1);
-    expect(qp.result).toHaveLength(1);
+    expect(qu.value).toHaveLength(1);
+    expect(qp.value).toHaveLength(1);
 
     await orm.driver.exec(`
       DELETE FROM "posts";
       DELETE FROM "users";
     `);
     await new Promise((r) => setTimeout(r, 0));
-    await Promise.all([qu.promise, qp.promise]);
-    expect(qu.result).toHaveLength(0);
-    expect(qp.result).toHaveLength(0);
+    await Promise.all([qu, qp]);
+    expect(qu.value).toHaveLength(0);
+    expect(qp.value).toHaveLength(0);
     qu.dispose();
     qp.dispose();
   });
@@ -490,12 +490,12 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     });
     const q = orm.findAll(UserWithRename, { orderBy: "id" });
     await q;
-    expect(await (q.result![0] as User).name).toBe("Alice");
+    expect(await (q.value![0] as User).name).toBe("Alice");
 
     await u.rename("Bob");
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
-    expect(await (q.result![0] as User).name).toBe("Bob");
+    await q;
+    expect(await (q.value![0] as User).name).toBe("Bob");
 
     // The instance itself also updates since the findAll refetch re-applies
     // the row onto the same identity-map instance.
@@ -582,9 +582,9 @@ describe("reactive raw SQL: orm is oblivious to the origin of the mutation", () 
     // Explicit manual notification wakes subscribers back up.
     orm.invalidate("users");
     await new Promise((r) => setTimeout(r, 0));
-    await q.promise;
+    await q;
     expect(runs).toBe(1);
-    expect(q.result).toHaveLength(1);
+    expect(q.value).toHaveLength(1);
     q.dispose();
   });
 });

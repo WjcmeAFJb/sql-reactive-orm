@@ -11,62 +11,87 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { todayISO } from "@/lib/utils";
-import type { AppState } from "@/db/state";
+import { Account, Category, Transaction } from "@/db/entities";
+import { useOrm } from "@/db/orm-context";
+
+export type TxFormMode =
+  | { kind: "create" }
+  | { kind: "edit"; tx: Transaction };
 
 /**
- * Pure form logic — talks to the ORM via `state.addTransaction`. The
- * dropdowns just iterate the `accounts` / `categories` Query results;
- * because those queries are reactive, adding or renaming an account
- * elsewhere is immediately reflected here.
+ * Create or edit a regular (non-transfer) transaction. For edit mode,
+ * initial values come straight from the entity getters via `use` — no
+ * separate load path.
  */
 export const TransactionForm = observer(function TransactionForm({
-  state,
+  mode,
   onDone,
 }: {
-  state: AppState;
+  mode: TxFormMode;
   onDone: () => void;
 }) {
-  const accounts = state.accounts.result ?? use(state.accounts.promise);
-  const categories = state.categories.result ?? use(state.categories.promise);
+  const orm = useOrm();
+  const accounts = use(orm.findAll(Account, { orderBy: "id" }));
+  const categories = use(orm.findAll(Category, { orderBy: "id" }));
 
+  const initial =
+    mode.kind === "edit"
+      ? {
+          amount: use(mode.tx.amount) as number,
+          accountId: use(mode.tx.accountId) as number,
+          categoryId: use(mode.tx.categoryId) as number | null,
+          note: use(mode.tx.note) as string | null,
+          date: use(mode.tx.date) as string,
+        }
+      : null;
+
+  const initialKind: "income" | "expense" =
+    initial && initial.amount > 0 ? "income" : "expense";
+
+  const [kind, setKind] = useState<"income" | "expense">(initialKind);
   const [accountId, setAccountId] = useState<string>(
-    String(accounts[0]?.id ?? ""),
+    String(initial?.accountId ?? accounts[0]?.id ?? ""),
   );
-  const [categoryId, setCategoryId] = useState<string>("none");
-  const [kind, setKind] = useState<"expense" | "income">("expense");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(todayISO());
-  const [submitting, setSubmitting] = useState(false);
+  const [categoryId, setCategoryId] = useState<string>(
+    initial?.categoryId != null ? String(initial.categoryId) : "none",
+  );
+  const [amount, setAmount] = useState(
+    initial ? String(Math.abs(initial.amount)) : "",
+  );
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [busy, setBusy] = useState(false);
 
-  async function handleSubmit(e: FormEvent): Promise<void> {
+  async function submit(e: FormEvent): Promise<void> {
     e.preventDefault();
-    const parsed = parseFloat(amount);
-    if (!Number.isFinite(parsed)) return;
-    setSubmitting(true);
+    const n = parseFloat(amount);
+    if (!Number.isFinite(n)) return;
+    setBusy(true);
+    const payload = {
+      accountId: Number(accountId),
+      categoryId: categoryId === "none" ? null : Number(categoryId),
+      amount: kind === "expense" ? -Math.abs(n) : Math.abs(n),
+      note: note || null,
+      date,
+    };
     try {
-      await state.addTransaction({
-        accountId: Number(accountId),
-        categoryId: categoryId === "none" ? null : Number(categoryId),
-        amount: kind === "expense" ? -Math.abs(parsed) : Math.abs(parsed),
-        note: note || null,
-        date,
-      });
+      if (mode.kind === "edit") {
+        await orm.update(mode.tx, payload);
+      } else {
+        await orm.insert(Transaction, { ...payload, transferId: null });
+      }
       onDone();
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="kind">Type</Label>
-          <Select
-            value={kind}
-            onValueChange={(v) => setKind(v as typeof kind)}
-          >
+          <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
             <SelectTrigger id="kind">
               <SelectValue />
             </SelectTrigger>
@@ -99,7 +124,7 @@ export const TransactionForm = observer(function TransactionForm({
           </SelectTrigger>
           <SelectContent>
             {accounts.map((a) => (
-              <AccountOption key={a.id} id={a.id} name={a.name} />
+              <EntityNameOption key={a.id} id={a.id} name={a.name} />
             ))}
           </SelectContent>
         </Select>
@@ -113,17 +138,15 @@ export const TransactionForm = observer(function TransactionForm({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Uncategorized</SelectItem>
-            {categories
-              .filter(() => true)
-              .map((c) => (
-                <CategoryOption
-                  key={c.id}
-                  id={c.id}
-                  name={c.name}
-                  kind={c.kind}
-                  filterKind={kind}
-                />
-              ))}
+            {categories.map((c) => (
+              <CategoryKindOption
+                key={c.id}
+                id={c.id}
+                name={c.name}
+                kind={c.kind}
+                filterKind={kind}
+              />
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -155,17 +178,19 @@ export const TransactionForm = observer(function TransactionForm({
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancel
         </Button>
-        <Button type="submit" disabled={submitting || !amount}>
-          {submitting ? "Saving…" : "Add transaction"}
+        <Button type="submit" disabled={busy || !amount}>
+          {busy
+            ? "Saving…"
+            : mode.kind === "edit"
+              ? "Save changes"
+              : "Add transaction"}
         </Button>
       </div>
     </form>
   );
 });
 
-// Sub-components let us call `use` on the entity fields without hoisting
-// async reads to the parent. Each render scopes its own suspense.
-const AccountOption = observer(function AccountOption({
+const EntityNameOption = observer(function EntityNameOption({
   id,
   name,
 }: {
@@ -175,7 +200,7 @@ const AccountOption = observer(function AccountOption({
   return <SelectItem value={String(id)}>{use(name)}</SelectItem>;
 });
 
-const CategoryOption = observer(function CategoryOption({
+const CategoryKindOption = observer(function CategoryKindOption({
   id,
   name,
   kind,

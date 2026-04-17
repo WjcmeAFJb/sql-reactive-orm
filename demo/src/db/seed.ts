@@ -97,6 +97,34 @@ export async function seed(orm: Orm): Promise<void> {
       amount,
       note: pick(TX_NOTES),
       date: d.toISOString().slice(0, 10),
+      transferId: null,
+    });
+  }
+
+  // A couple of transfers so the UI has something to render.
+  const transfers = [
+    { from: 0, to: 1, amt: 500, day: 3, note: "Move to savings" },
+    { from: 1, to: 2, amt: 80, day: 12, note: "ATM withdrawal" },
+  ];
+  for (const t of transfers) {
+    const d = new Date();
+    d.setDate(d.getDate() - t.day);
+    const transferId = `seed-${t.from}-${t.to}-${t.day}`;
+    await orm.insert(Transaction, {
+      accountId: accounts[t.from]!.id,
+      categoryId: null,
+      amount: -t.amt,
+      note: t.note,
+      date: d.toISOString().slice(0, 10),
+      transferId,
+    });
+    await orm.insert(Transaction, {
+      accountId: accounts[t.to]!.id,
+      categoryId: null,
+      amount: t.amt,
+      note: t.note,
+      date: d.toISOString().slice(0, 10),
+      transferId,
     });
   }
 }

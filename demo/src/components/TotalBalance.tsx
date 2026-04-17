@@ -1,20 +1,19 @@
 import { observer } from "mobx-react-lite";
 import { use } from "react";
 import { formatMoney } from "@/lib/utils";
-import type { AppState } from "@/db/state";
+import { Account } from "@/db/entities";
+import { useOrm } from "@/db/orm-context";
 
 /**
- * Summed balance across all accounts. The component is a two-liner: it
- * reads every account's initial balance and every transaction's amount.
- * Reactivity flows automatically — any insert, update, or delete
- * anywhere recomputes this number.
+ * Summed balance across all accounts. Ten lines. No reducer, no
+ * selector, no manual memoization — MobX re-renders this component
+ * whenever any of the fields it reads moves, nothing else.
  */
-export const TotalBalance = observer(function TotalBalance({
-  state,
-}: {
-  state: AppState;
-}) {
-  const accounts = state.accounts.result ?? use(state.accounts.promise);
+export const TotalBalance = observer(function TotalBalance() {
+  const orm = useOrm();
+  const accounts = use(
+    orm.findAll(Account, { orderBy: "id", with: { transactions: true } }),
+  );
   let total = 0;
   for (const a of accounts) {
     total += use(a.initialBalance) as number;
