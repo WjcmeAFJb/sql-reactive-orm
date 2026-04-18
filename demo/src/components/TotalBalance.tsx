@@ -1,21 +1,28 @@
-import { orm } from "@/db/orm";
 import { use } from "react";
+import { sql } from "kysely";
+import { orm } from "@/db/orm";
 import { formatMoney } from "@/lib/utils";
-import { Account } from "@/db/entities";
 
 /**
- * Summed balance across all accounts. Reads every account's initial
- * balance and every transaction's amount; the auto-observer Babel
- * plugin wraps this so any of those changes re-renders exactly this
- * number.
+ * One scalar SQL: sum of every account's `initialBalance` + every
+ * transaction's `amount`. The reactive driver sees the query touches
+ * `accounts` and `transactions`; any mutation to either refetches and
+ * diffs — if the scalar didn't move, the row reference is preserved
+ * and this component skips rendering.
  */
 export function TotalBalance() {
-  const accounts = use(orm.findAll(Account, { orderBy: "id", with: { transactions: true } }));
-  let total = 0;
-  for (const a of accounts) {
-    total += use(a.initialBalance) as number;
-    for (const t of use(a.transactions)) total += use(t.amount) as number;
-  }
+  const [row] = use(
+    orm.sqlQuery((db) =>
+      db.selectNoFrom(
+        sql<number>`
+          COALESCE((SELECT SUM(initialBalance) FROM accounts), 0)
+          + COALESCE((SELECT SUM(amount) FROM transactions), 0)
+        `.as("total"),
+      ),
+    ),
+  );
+  const total = row?.total ?? 0;
+
   return (
     <div className="flex items-baseline gap-3">
       <span className="text-xs uppercase tracking-wider text-muted-foreground">Net worth</span>

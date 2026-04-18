@@ -29,6 +29,19 @@ const COLORS = [
 
 export function CategoriesDialog() {
   const categories = use(orm.findAll(Category, { orderBy: "id" }));
+  const stats = use(
+    orm.sqlQuery(
+      (db) =>
+        db
+          .selectFrom("categories as c")
+          .leftJoin("transactions as t", "t.categoryId", "c.id")
+          .select("c.id")
+          .select((eb) => eb.fn.count<number>("t.id").as("txCount"))
+          .groupBy("c.id"),
+      { keyBy: (r) => r.id },
+    ),
+  );
+  const statsById = new Map(stats.map((r) => [r.id, r]));
   const s = useLocalObservable(() => ({
     editingId: null as number | null,
   }));
@@ -48,6 +61,7 @@ export function CategoriesDialog() {
               <CategoryRow
                 key={c.id}
                 category={c}
+                stats={statsById.get(c.id)}
                 onEdit={() => (s.editingId = c.id)}
                 onDelete={() => void c.remove()}
               />
@@ -61,17 +75,19 @@ export function CategoriesDialog() {
 
 function CategoryRow({
   category,
+  stats,
   onEdit,
   onDelete,
 }: {
   category: Category;
+  stats: { txCount: number } | undefined;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const name = use(category.name);
   const color = use(category.color);
   const kind = use(category.kind);
-  const txs = use(category.transactions);
+  const txCount = stats?.txCount ?? 0;
 
   return (
     <div className="flex items-center gap-3 py-1.5">
@@ -79,7 +95,7 @@ function CategoryRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">{name}</div>
         <div className="text-xs text-muted-foreground">
-          {kind} · {txs.length} tx
+          {kind} · {txCount} tx
         </div>
       </div>
       <Button variant="ghost" size="icon" onClick={onEdit}>

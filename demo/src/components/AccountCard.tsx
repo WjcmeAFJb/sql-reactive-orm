@@ -6,12 +6,18 @@ import { cn, formatMoney } from "@/lib/utils";
 import { Account } from "@/db/entities";
 import { ui } from "@/ui/ui-state";
 
-export function AccountCard({ account }: { account: Account }) {
+export function AccountCard({
+  account,
+  stats,
+}: {
+  account: Account;
+  /** Row from the account-stats sqlQuery. Undefined briefly for a freshly-inserted account. */
+  stats: { balance: number; txCount: number } | undefined;
+}) {
   const name = use(account.name);
   const color = use(account.color);
-  const initial = use(account.initialBalance);
-  const txs = use(account.transactions);
-  const balance = txs.reduce((sum, t) => sum + (use(t.amount) as number), initial);
+  const balance = stats?.balance ?? 0;
+  const txCount = stats?.txCount ?? 0;
 
   return (
     <Card className="group relative overflow-hidden">
@@ -24,7 +30,7 @@ export function AccountCard({ account }: { account: Account }) {
           >
             {formatMoney(balance)}
           </div>
-          <div className="pb-1 text-xs text-muted-foreground">{txs.length} tx</div>
+          <div className="pb-1 text-xs text-muted-foreground">{txCount} tx</div>
         </div>
       </CardContent>
       <Button
