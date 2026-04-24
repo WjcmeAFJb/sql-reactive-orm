@@ -39,7 +39,7 @@ SQL through `orm.driver` participates in the same invalidation bus, so
 ## Install
 
 ```bash
-pnpm add 'https://github.com/WjcmeAFJb/sql-reactive-orm/releases/download/v0.1.0/sql-reactive-orm-0.1.0.tgz'
+pnpm add 'https://github.com/WjcmeAFJb/sql-reactive-orm/releases/download/v0.2.0/sql-reactive-orm-0.2.0.tgz'
 ```
 
 Peers you're likely to want:

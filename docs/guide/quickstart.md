@@ -8,7 +8,7 @@ re-rendering only the rows whose data changed.
 ```bash
 pnpm create vite@latest tracker -- --template react-ts
 cd tracker
-pnpm add 'https://github.com/WjcmeAFJb/sql-reactive-orm/releases/download/v0.1.0/sql-reactive-orm-0.1.0.tgz' \
+pnpm add 'https://github.com/WjcmeAFJb/sql-reactive-orm/releases/download/v0.2.0/sql-reactive-orm-0.2.0.tgz' \
         sql.js kysely
 ```
 
