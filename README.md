@@ -295,5 +295,6 @@ pnpm typecheck
 
 ## License
 
-See the project's `LICENSE` once set; pending a formal decision, treat
-this as a personal project distributed in source form.
+LGPL-3.0-or-later — see [`LICENSE`](./LICENSE) for the project notice,
+[`COPYING.LESSER`](./COPYING.LESSER) for the full LGPL text, and
+[`COPYING`](./COPYING) for the GPL text it extends.
