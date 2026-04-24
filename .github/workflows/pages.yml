@@ -1,0 +1,80 @@
+name: pages
+
+# Rebuild + redeploy Pages when docs or the demo change on master, without
+# cutting a new release. Also available as a manual dispatch for ad-hoc
+# redeploys (e.g. after fixing only frontmatter).
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "docs/**"
+      - "demo/**"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build docs + demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build VitePress docs
+        working-directory: docs
+        env:
+          DOCS_BASE: /${{ github.event.repository.name }}/
+        run: pnpm build
+
+      - name: Build money-tracker demo
+        working-directory: demo
+        run: pnpm build --base /${{ github.event.repository.name }}/demo/
+
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p pages-dist
+          cp -R docs/.vitepress/dist/. pages-dist/
+          mkdir -p pages-dist/demo
+          cp -R demo/dist/. pages-dist/demo/
+          cp demo/dist/index.html pages-dist/demo/404.html || true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+
+  deploy:
+    name: Deploy GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 10
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

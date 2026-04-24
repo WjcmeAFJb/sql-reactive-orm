@@ -28,7 +28,7 @@ export default defineConfig({
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Concepts", link: "/concepts/reactivity" },
       { text: "API", link: "/api/orm" },
-      { text: "Demo", link: `${base}demo/`, target: "_blank" },
+      { text: "Demo", link: "/demo/", target: "_blank" },
       {
         text: "GitHub",
         link: "https://github.com/WjcmeAFJb/sql-reactive-orm",

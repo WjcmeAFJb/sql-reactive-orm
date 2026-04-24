@@ -4,13 +4,17 @@ hero:
   name: sql-reactive-orm
   text: Reactive ORM for SQLite, built on MobX
   tagline: Entity fields are Promises. React `use()`-native. Aggregate queries that re-run — and re-render only the leaves whose data moved.
+  image:
+    light: /hero-light.svg
+    dark: /hero-dark.svg
+    alt: Reactive ORM bridging a SQLite database to React components via Promise-typed fields
   actions:
     - theme: brand
       text: Get started
       link: /guide/getting-started
     - theme: alt
       text: Live demo
-      link: /sql-reactive-orm/demo/
+      link: /demo/
     - theme: alt
       text: GitHub
       link: https://github.com/WjcmeAFJb/sql-reactive-orm
