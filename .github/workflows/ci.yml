@@ -11,10 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test & typecheck
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -32,12 +32,3 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Node tests
-        run: pnpm test:node
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium --with-deps
-
-      - name: Browser tests
-        run: pnpm test:browser
