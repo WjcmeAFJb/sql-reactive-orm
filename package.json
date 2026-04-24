@@ -2,12 +2,34 @@
   "name": "sql-reactive-orm",
   "version": "0.1.0",
   "description": "Reactive ORM for SQLite, built on MobX. Fields and relations are Promises that hydrate on first read — usable directly with React `use` / Suspense.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WjcmeAFJb/sql-reactive-orm.git"
+  },
+  "homepage": "https://WjcmeAFJb.github.io/sql-reactive-orm/",
+  "keywords": [
+    "sqlite",
+    "orm",
+    "reactive",
+    "mobx",
+    "react",
+    "suspense",
+    "kysely",
+    "sqljs",
+    "sql-git"
+  ],
   "type": "module",
   "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./drivers/sqljs": "./src/drivers/sqljs.ts"
   },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
   "bin": {
     "sql-reactive-orm-codegen": "./src/cli/codegen.ts"
   },

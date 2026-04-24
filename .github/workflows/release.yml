@@ -1,0 +1,115 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build lib + docs + demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tarball-name: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack library tarball
+        id: pack
+        run: |
+          mkdir -p dist-release
+          pnpm pack --pack-destination dist-release
+          TARBALL=$(ls dist-release/*.tgz | head -n1)
+          echo "tarball=$(basename "$TARBALL")" >> "$GITHUB_OUTPUT"
+          echo "Tarball: $TARBALL"
+
+      - name: Build VitePress docs
+        working-directory: docs
+        env:
+          DOCS_BASE: /${{ github.event.repository.name }}/
+        run: pnpm build
+
+      - name: Build money-tracker demo
+        working-directory: demo
+        run: pnpm build --base /${{ github.event.repository.name }}/demo/
+
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p pages-dist
+          cp -R docs/.vitepress/dist/. pages-dist/
+          mkdir -p pages-dist/demo
+          cp -R demo/dist/. pages-dist/demo/
+          cp demo/dist/index.html pages-dist/demo/404.html || true
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sql-reactive-orm-tarball
+          path: dist-release/*.tgz
+          if-no-files-found: error
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-dist
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sql-reactive-orm-tarball
+          path: ./tarball
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: tarball/*.tgz
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            ```bash
+            pnpm add 'https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ needs.build.outputs.tarball-name }}'
+            ```
+
+            Docs: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+            Demo: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/demo/
+
+  pages:
+    name: Deploy GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 10
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
